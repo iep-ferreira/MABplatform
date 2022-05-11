@@ -1,6 +1,6 @@
 ---
 title: "Prototype - An agent-based platform to evaluate the performance of sampling designs and modelling approaches when estimating animal abundance"
-author: "Denner A. B. Fabiano, Iuri E. P. Ferreira, Niamh M. Mimnagh, Rafael De Andrade Moral"
+author: "Denner A. B. Fabiano, Iuri E. P. Ferreira"
 date: "27/10/2021"
 output: 
   html_document: 
@@ -10,35 +10,63 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
 ## Packages
 
 ```{r}
 #install.packages("landscapeR")
 #install.packages("raster")
-library(raster)
+library(raster) 
 library(landscapeR)
 ```
 
 ## To generate the landscape
 
+Função que cria o ambiente (paisagem). O usuário pode configurar o tamanho da rede ``l.size``, o *vetor* número de fragmentos ``n.patches``, com três níveis de recurso (pobre, intermediário, rico), e cobertura de cada tipo de fragmento ``cover`` (soma da ``cover`` < 1).   
+
+ + default para ``l.size`` é 100 px,
+ + default para ``n.patches`` é 2 fragmentos de cada tipo,
+ + default para ``cover`` é de 25% para cada fragmento.   
+
+
 ```{r}
-land.create<-function(l.size=100,n.patches=c(2,2,2),cover=c(0.15,0.20,0.25)){
-# n.patches = número de patches (pobres, intermediários e ricos em recursos / abrigos) 
-# recursos associados aos 3 tipos de patches
-val<-c(1,3,7)  
-# Cover = cobertura de cada tipo de paisagem (soma < 1)
-if(sum(cover)>1){print("Erro. Cobertura total não pode ser maior do que 1"); break}
-# Total de recursos 
-t.r<-val%*%cover
-# cover <- lista de 
-# l.size <- tamanho do lado do reticulado  
-m <- matrix(0, l.size, l.size) # the empty landscape
-r <- raster(m, xmn=0, xmx=l.size, ymn=0, ymx=l.size)
-for(i in 1:length(cover)){
-r <- makeClass(r, n.patches[i], round(cover[i]*l.size^2/n.patches[i]), val=val[i])
-}
-return(list("raster"=r,"recursos"=t.r))
-}
+land.create <- function(l.size = 100, n.patches = c(2, 2, 2), cover = c(0.25, 0.25, 0.25)){
+  
+  # Cria valores de qualidade / recursos 
+  val <- c(1, 3, 7)
+  
+  # Cover = cobertura de cada tipo de paisagem (soma < 1)
+  if( sum(cover) > 1 ){print("Erro. Cobertura total não pode ser maior do que 1"); break}
+  
+  # Total de recursos 
+  t.r <- val %*% cover
+  
+  #### Criando a matriz de recurso ####
+  
+  # criando uma paisagem vazia - só com zeros
+  m <- matrix(0, l.size, l.size) # the empty landscape
+  
+  # transformando a matriz em raster
+  r <- raster(m, xmn=0, xmx=l.size, ymn=0, ymx=l.size)
+  
+  # cria sobre o raster r manchas disjuntas que 
+  # representam fragmentos pobres (i=1), 
+  # intermediários (i=2) e ricos (i=3)
+  for(i in 1:length(cover)){
+    r <- makeClass(r, n.patches[i],
+                   round(cover[i]*l.size^2/n.patches[i]), val = val[i])
+  }
+  
+  # retorna o que é importante
+  return( list("raster"=r,"recursos"=t.r) )
+  
+} # fim da função land.create
+# teste
+obj <- land.create(200, c(1, 2, 3), c(0.20,0.15,0.30))
+# exemplo: criar uma paisagem grande, pobre e muito fragmentada
+obj <- land.create(l.size = 500, n.patches = c(10, 3, 3), 
+                   cover = c(0.30, 0.05, 0.05) )
+plot(obj$raster)
 ```
 
 
@@ -48,9 +76,13 @@ Each time step is one hour. Simulations will represent 21 consecutive weeks. We 
 
 We considered the individual rate of four traces produced every day.   
 
+ + ``n`` is the number of animal on the environment
+ + ``ra`` é o argumento que recebe o raster da paisagem
+ + ``time`` is the number of weeks (adaptation + study phases)
+ + ``where`` is where the animals are placed at the start of simulation (over all the environment or only where there are resources)
 
 ```{r}
-animal.mov<-function(n=100,ra=NULL,time=21,where="resource"){
+animal.mov<-function( n = 100, ra = NULL, time = 21, where = "resource"){
 
   # Time in weeks (20 adaptation + 1 experiment)
 if(time<=1){print("Error. At least two weeks are necessary!"); break}
@@ -273,7 +305,7 @@ traces.viewer(obj=din,r=ra)
 
 ### To set sampling transects and to count traces
 ```{r}
-tracks<-tracks.set(obj=din,ra=ra,sampling="convenience",
+tracks<-tracks.set(obj=din,ra=ra,sampling="random",
                    l=300,con=0.01)
 tracks$coverage
 tracks$counts
