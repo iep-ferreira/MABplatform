@@ -87,34 +87,55 @@ animal.mov<-function( n = 100, ra = NULL, time = 21, where = "resource"){
   # Time in weeks (20 adaptation + 1 experiment)
 if(time<=1){print("Error. At least two weeks are necessary!"); break}
   
+  # Total de tempo gasto nas simulações (em horas)
 time.step<-round(time)*7*24
+  # Tempo total de adaptação (em horas)
 time.step.adapt<-(round(time)-1)*7*24
 
 # Número de animais (n)
 # r = valores do raster (formato de matriz)
 if(is.null(ra)){print("Erro. Inserir os valores do raster no segundo argumento"); break}
   
+# Extraindo valores do raster, na forma de matriz 
 r<-values(ra,format="matrix")
+# Neste caso, r vira uma matriz auxiliar
 
+# dimensão da paisagem
 l<-dim(r)[1]
 
+# Gera coordenadas inicias x e y para cada 
+# um dos n indivíduos simulados
+
+# Aleatoriamente ou só onde tem recursos?
 if(where=="random"||where=="resource"){
-if(where=="random"){
-M<-matrix(sample(1:l,2*n,replace=TRUE),ncol=2)
-} else{
-coords<-NULL
-for(i in 2:(l-1)){
-for(j in 2:(l-1)){
-if(r[i,j]>0){coords<-rbind(coords,c(i,j))}  
-}  
-}
-size<-dim(coords)[1]  
-k<-sample.int(size,n,replace=TRUE)  
-M<-coords[k,]  # matriz de posição dos animais
-} # fim else
-} else{
+
+if(where=="random"){ # distribuição espacial sem restrições
+    # posição inicial dos indíviduos (x_0, y_0)
+    M <- matrix( sample(1:l,2*n,replace=TRUE) , ncol=2)
+
+} else{ # entra no else se for "resource"
+
+  # distribuição espacial apenas aonde tem recurso
+  coords<-NULL
+  for(i in 2:(l-1)){
+  for(j in 2:(l-1)){
+  if(r[i,j]>0){coords<-rbind(coords,c(i,j))}  
+  # coords são os pontos onde tem recurso
+  } # end for 1 
+  } # end for 2
+  
+size <- dim(coords)[1] # tamanho do objeto coords  
+# sorteio das posições iniciais dentro de coords
+k <- sample.int(size, n, replace=TRUE)  
+
+M <- coords[k,]  # matriz de posição dos animais
+} # fim else if random 
+
+  } else{
 print("Error. where must be random or resource"); break  
 }  
+
+# Paramos aqui! Agora precisamos discutir as regras de #movimentação.
   
 R<-NULL
 MAUX<-M
@@ -170,6 +191,9 @@ R[[j]]<-M
 } # fim j 
 return(list("Evol"=R,"Traces"=traces,"time.step"=time.step,"time.step.adapt"=time.step.adapt))
 }
+# teste da função
+mov_results <- animal.mov(n = 100, ra = obj$raster)
+mov_results
 ```
  
 ## Individual tracks' viewer 
@@ -202,6 +226,7 @@ plot(flip(t(r),direction='y'))+for(i in 1:n) lines(tracks[[i]][1:time.step.adapt
 points(tracks[[i]][time.step,1],tracks[[i]][time.step,2],cex=0.8,col=2,pch=19)  
 }
 } # fim function
+#
 ```
 
 ## Viewer for traces
@@ -294,7 +319,7 @@ end_time - start_time
 
 ### To visualize tracks
 ```{r}
-tracks.viewer(obj=din,r=ra,adapt=FALSE)
+tracks.viewer(obj=din, r=ra, adapt=TRUE)
 ```
 
 ### To visualize traces in environment
@@ -306,7 +331,7 @@ traces.viewer(obj=din,r=ra)
 ### To set sampling transects and to count traces
 ```{r}
 tracks<-tracks.set(obj=din,ra=ra,sampling="random",
-                   l=300,con=0.01)
+                   l=3000,con=0.05)
 tracks$coverage
 tracks$counts
 ```
