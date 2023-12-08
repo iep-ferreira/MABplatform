@@ -1,0 +1,59 @@
+---
+title: "Algorithms"
+author: "Denner, Iuri"
+date: "29/06/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Animal movment function
+
+Each time step is one hour. Simulations will represent 21 consecutive weeks. We considered the first twenty weeks needed to individuals establish the natural pattern of occupancy from random initial positions (adaptation phase). The remaining week is used to simulate the deposition of traces on the environment and level of patch occupancy. 
+
+We considered the individual rate of four traces produced every day.   
+
+ + ``n`` is the number of animal on the environment
+ + ``ra`` é o argumento que recebe o raster da paisagem
+ + ``time`` is the number of weeks (adaptation + study phases)
+ + ``where`` is where the animals are placed at the start of simulation (over all the environment or only where there are resources)
+ 
+ 
+ + Observação: adequar a descrição! 
+ 
+ + Início
+   + Escreva `n`, `ra`, `time`, `where`;
+   + Confere $time \geq 0$, se não `break`;
+   + Calcula tempo de execução e tempo de adaptação;
+   + Confere se o raster `ra` foi incluído; 
+   + Transformar `ra` em matriz (`r <- ra`); 
+   + Leia a dimensão do `ra`;
+   
+     + If where == random: 
+     
+      - sortear $n$ pares de coordenadas da matriz `ra`, sem restrições
+      
+      - `M` recebe posições iniciais 
+      
+     + Else: 
+     
+      - `coords` recebe coordenadas em que `r>0` (onde tem recurso)
+      
+      -  sortear $n$ pares de coordenadas da matriz `coords`
+       
+      - `M` recebe posições iniciais de `coords` (`coords[k,]`)
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
