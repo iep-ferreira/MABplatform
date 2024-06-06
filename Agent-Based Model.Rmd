@@ -26,7 +26,7 @@ library(landscapeR)
 source("./source-codes/functions.R")
 ```
 
-## Função que cria o ambiente (paisagem)
+## Função que cria o ambiente aleatório (paisagem)
 
 O usuário pode configurar o tamanho da rede ``l.size``, o *vetor* número de fragmentos ``n.patches``, com três níveis de recurso (pobre, intermediário, rico), e cobertura de cada tipo de fragmento ``cover`` (soma da ``cover`` < 1).   
 
@@ -39,6 +39,51 @@ O usuário pode configurar o tamanho da rede ``l.size``, o *vetor* número de fr
 land <- land.create(l.size = 500, n.patches =  c(1, 2, 3), cover = c(0.20,0.15,0.30))
 plot(land$raster)
 ```
+
+## Carregamento de um mapa real de uso e ocupação do solo no Brasil
+
+Usando o programa bioma stats. 
+
+```{r}
+library(biomastats)
+library(sf)
+library(mapview)
+```
+
+  - Delimitação da área
+  
+```{r}
+make_polygon(lat = -23.6, lon = -48.5, size = 1, shape = "square")
+(path_package <- system.file(package = "biomastats"))
+```
+
+```{r}
+shp_path <- file.path(path_package, "shp/polygon.shp")
+mapview(sf::read_sf(shp_path))
+```
+
+  - Download dos mapas de uso e ocupação para algum ano de interesse
+
+```{r}
+data_maps <- load_rasters(shape_path = shp_path, start=1985, end=2020, data_from = "example")
+```
+
+  Obs: Urgente: coorigir no bioma stats > função land_vis Error in data$raster[[year - 1984]] : subscript out of bounds
+
+```{r}
+land_vis(data_maps, year = 2020)
+```
+
+
+```{r}
+land <- data_maps$raster[[35]]
+plot(land)
+```
+
+```{r}
+unique(getValues(land))
+```
+
 
 ## Movimentação dos animais 
 
@@ -58,9 +103,11 @@ plot(land$raster)
     + ``where`` é onde posicionamos os animais no início da população. (``all`` para posicioná-los em todo o ambiente e ``resources`` para apenas aonde tem recursos).
  
 ```{r}
-ra <- land$raster
-mov <- animal.mov(n = 25, ra = ra , time = 21, where = "resource")
+# ra <- land$raster
+ra <- land
+mov <- animal.mov(n = dim(ra)[1], ra = ra , time = 21, where = "resource")
 ```
+
 
 ## Para visualizar a movimentação animal 
    
@@ -69,8 +116,11 @@ mov <- animal.mov(n = 25, ra = ra , time = 21, where = "resource")
    + Com ``adapt = TRUE`` visualizamos todas as semanas, incluindo a fase de adaptação. 
 
 ```{r}
-tracks.viewer(obj = mov, r = ra, adapt = FALSE)
-tracks.viewer(obj = mov, r = ra, adapt = TRUE)
+dim(land)
+raster_obj <- raster(as.matrix(land), xmn=0, xmx=dim(land)[1]-1, ymn=0, ymx=dim(land)[1]-1)
+# tem alguma coisa de errado na função de movimentação! 
+tracks.viewer(obj = mov, r = raster_obj, adapt = FALSE)
+tracks.viewer(obj = mov, r = raster_obj, adapt = TRUE)
 ```
 
 ## Para visualizar os vestígios

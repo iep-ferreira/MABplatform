@@ -40,7 +40,20 @@ update_mov <- function(M = M, time.step = time.step, time.step.adapt = time.step
   R[[1]] <- M
   n <- dim(M)[1]
   
-  classe<-c(1,2,3,4,5,6,7,8,9)
+  # classificações de uso e ocupação
+  classe <- 1:62
+  # peso - qualidade de ocupação
+  weights_classes <- rep(0.1, 62) 
+  weights_classes[3] <- 10 # floresta natural 
+  weights_classes[9] <- 8 # floresta plantada
+  weights_classes[11] <- 7 # áreas alagadas
+  weights_classes[15] <- 2 # pastagens 
+  weights_classes[21] <- 3 # mosaico de usos
+  weights_classes[33] <- 1 # corpos hídricos
+  # consideramos a movimentação no período produtivo
+  weights_classes[39] <- 3 # soja
+  weights_classes[41] <- 4 # outros cultivos temporários
+  
   traces<-NULL
   for(j in 2:time.step){ 
     
@@ -66,9 +79,10 @@ update_mov <- function(M = M, time.step = time.step, time.step.adapt = time.step
         v.aux<-c(r[x-1,y+1],r[x,y+1],r[x+1,y+1], 
                  r[x-1,y],r[x,y],r[x+1,y],
                  r[x-1,y-1],r[x,y-1],r[x+1,y-1])
+        v.weights <- weights_classes[v.aux]
         if(sum(v.aux)>0){
-          p.aux<-v.aux/sum(v.aux)
-          cl<-sample(classe,1,prob=p.aux)
+          p.weights <- v.weights/sum(v.weights)
+          cl<-sample(v.aux,1,prob=p.weights)
         } else{
           cl<-sample(classe,1)
         } 
@@ -175,12 +189,14 @@ tracks.viewer<-function(obj=NULL, r=NULL, adapt=FALSE){
     }
     tracks[[i]]<-coords
   }
+  #flip(t(r),direction='y') no plot
   if(adapt==FALSE){
-    plot(flip(t(r),direction='y'))+for(i in 1:n) lines(tracks[[i]][(time.step.adapt+1):time.step,],type='l',cex=0.05,col=1)+points(tracks[[i]][time.step,1],tracks[[i]][time.step,2],cex=0.8,col=2,
-                                                                                                                                   pch=19)} else{
-                                                                                                                                     plot(flip(t(r),direction='y'))+for(i in 1:n) lines(tracks[[i]][1:time.step.adapt,],type='l',cex=0.05,col=4) + lines(tracks[[i]][(time.step.adapt+1):time.step,],type='l',cex=0.05,col=1)+
-                                                                                                                                       points(tracks[[i]][time.step,1],tracks[[i]][time.step,2],cex=0.8,col=2,pch=19)  
-                                                                                                                                   }
+    plot(flip(t(r),direction='y'))+
+      for(i in 1:n) lines(tracks[[i]][(time.step.adapt+1):time.step,],type='l',cex=0.05,col=1)+
+      points(tracks[[i]][time.step,1],tracks[[i]][time.step,2],cex=0.8, col=2, pch=19)} 
+  else{
+    plot(flip(t(r),direction='y'))+for(i in 1:n) lines(tracks[[i]][1:time.step.adapt,],type='l',cex=0.05,col=4) + lines(tracks[[i]][(time.step.adapt+1):time.step,],type='l',cex=0.05,col=1) 
+    points(tracks[[i]][time.step,1],tracks[[i]][time.step,2],cex=0.8,col=2,pch=19)                                                                                                                                 }
 } # fim for tracks viewer
 
 traces.viewer<-function(obj=NULL, r=NULL){
