@@ -18,6 +18,9 @@ knitr::opts_chunk$set(echo = TRUE)
 #install.packages("raster")
 library(raster) 
 library(landscapeR)
+library(biomastats)
+library(sf)
+library(mapview)
 ```
 
 ## Carrega as funções através do código-fonte
@@ -44,12 +47,6 @@ plot(land$raster)
 
 Usando o programa bioma stats. 
 
-```{r}
-library(biomastats)
-library(sf)
-library(mapview)
-```
-
   - Delimitação da área
   
 ```{r}
@@ -74,16 +71,20 @@ data_maps <- load_rasters(shape_path = shp_path, start=1985, end=2020, data_from
 land_vis(data_maps, year = 2020)
 ```
 
+ - Atribui o mapa da `função_vis` ao objeto `land` 
 
 ```{r}
-land <- data_maps$raster[[35]]
-plot(land)
-```
+mapa <- data_maps$raster[[35]]
+lado <- dim(mapa)[1]
 
-```{r}
-unique(getValues(land))
-```
+# criando uma paisagem vazia - só com zeros
+novo_mapa <- matrix(getValues(mapa), lado, lado, byrow = TRUE) # the empty landscape
+  
+# transformando a matriz em raster
+mapa_bioma <- raster(novo_mapa, xmn=0, xmx=lado, ymn=0, ymx=lado)
 
+plot(mapa_bioma)
+```
 
 ## Movimentação dos animais 
 
@@ -104,8 +105,8 @@ unique(getValues(land))
  
 ```{r}
 # ra <- land$raster
-ra <- land
-mov <- animal.mov(n = dim(ra)[1], ra = ra , time = 21, where = "resource")
+ra <- mapa_bioma
+mov <- animal.mov(n = 20, ra = ra , time = 21, where = "resource")
 ```
 
 
@@ -116,19 +117,17 @@ mov <- animal.mov(n = dim(ra)[1], ra = ra , time = 21, where = "resource")
    + Com ``adapt = TRUE`` visualizamos todas as semanas, incluindo a fase de adaptação. 
 
 ```{r}
-dim(land)
-raster_obj <- raster(as.matrix(land), xmn=0, xmx=dim(land)[1]-1, ymn=0, ymx=dim(land)[1]-1)
-# tem alguma coisa de errado na função de movimentação! 
-tracks.viewer(obj = mov, r = raster_obj, adapt = FALSE)
-tracks.viewer(obj = mov, r = raster_obj, adapt = TRUE)
+tracks.viewer(obj = mov, r = ra)
 ```
+
 
 ## Para visualizar os vestígios
 
  + Para visualizar os vestígios depositados no ambiente. 
 
 ```{r}
-traces.viewer(obj = mov,r = ra)
+# objetivo de criar hotspots da presença do Javali com estes traços / vestígios
+traces.viewer(obj = mov, r = ra)
 ```
 
 ## Para fixar os transectos
@@ -142,10 +141,14 @@ traces.viewer(obj = mov,r = ra)
     + ``sampling == random`` é amostragem por conveniência. 
 
 ```{r}
-tracks<-tracks.set(obj = mov, ra = ra, sampling = "random",
-                   l = 1000, con = 0)
+# essa função será trocada por uma função que gera armadilhas fotográficas virtuais/computacionais 
+tracks<-tracks.set(obj = mov, ra = mapa_bioma, sampling = "random",
+                   l = 100, con = 0)
 tracks$coverage
 tracks$counts
 ```
 
+```{r}
+body(land_vis)
+```
 

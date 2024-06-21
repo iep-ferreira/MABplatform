@@ -81,10 +81,10 @@ update_mov <- function(M = M, time.step = time.step, time.step.adapt = time.step
                  r[x-1,y-1],r[x,y-1],r[x+1,y-1])
         v.weights <- weights_classes[v.aux]
         if(sum(v.aux)>0){
-          p.weights <- v.weights/sum(v.weights)
-          cl<-sample(v.aux,1,prob=p.weights)
+          p.weights <- v.weights/sum(v.weights) # normalização dos pesos 
+          cl<-sample(1:9, 1, prob = p.weights)
         } else{
-          cl<-sample(classe,1)
+          cl<-sample(1:9,1)
         } 
         
         switch(cl,
@@ -108,7 +108,7 @@ update_mov <- function(M = M, time.step = time.step, time.step.adapt = time.step
   return(list("R"= R, "traces" = traces))
 } # fim update for movements
 
-animal.mov<-function( n = 100, ra = NULL, time = 21, where = "resource"){
+animal.mov <- function( n = 100, ra = NULL, time = 21, where = "random"){
   
   # Time in weeks (20 adaptation + 1 experiment)
   if(time<=1){print("Error. At least two weeks are necessary!"); break}
@@ -123,7 +123,7 @@ animal.mov<-function( n = 100, ra = NULL, time = 21, where = "resource"){
   if(is.null(ra)){print("Erro. Inserir os valores do raster no segundo argumento"); break}
   
   # Extraindo valores do raster, na forma de matriz 
-  r <- values(ra,format="matrix")
+  r <- values(ra, format="matrix")
   # Neste caso, r vira uma matriz auxiliar
   
   # dimensão da paisagem
@@ -172,7 +172,7 @@ animal.mov<-function( n = 100, ra = NULL, time = 21, where = "resource"){
   return(list("Evol"=result$R,"Traces"=result$traces,"time.step"=time.step,"time.step.adapt"=time.step.adapt))
 } # fim for animal movements
 
-tracks.viewer<-function(obj=NULL, r=NULL, adapt=FALSE){
+tracks.viewer<-function(obj=NULL, r=NULL, adapt=FALSE, biomastats_std = TRUE){
   if(is.null(obj)){print("Erro. Inserir os resultados da simulação"); break}
   # r = valores do raster (formato de matriz)
   if(is.null(r)){print("Erro. Inserir os valores do raster no segundo argumento"); break}
@@ -189,7 +189,9 @@ tracks.viewer<-function(obj=NULL, r=NULL, adapt=FALSE){
     }
     tracks[[i]]<-coords
   }
-  #flip(t(r),direction='y') no plot
+
+if(biomastats_std == FALSE){  
+  
   if(adapt==FALSE){
     plot(flip(t(r),direction='y'))+
       for(i in 1:n) lines(tracks[[i]][(time.step.adapt+1):time.step,],type='l',cex=0.05,col=1)+
@@ -197,6 +199,66 @@ tracks.viewer<-function(obj=NULL, r=NULL, adapt=FALSE){
   else{
     plot(flip(t(r),direction='y'))+for(i in 1:n) lines(tracks[[i]][1:time.step.adapt,],type='l',cex=0.05,col=4) + lines(tracks[[i]][(time.step.adapt+1):time.step,],type='l',cex=0.05,col=1) 
     points(tracks[[i]][time.step,1],tracks[[i]][time.step,2],cex=0.8,col=2,pch=19)                                                                                                                                 }
+
+} else{
+  
+  tracks_df <- data.frame()
+  
+  for(i in 1:n){
+    coords <- data.frame(
+      x = numeric(),
+      y = numeric(),
+      animal = integer(),
+      step = integer()
+    )
+    for(j in (time.step.adapt+1):time.step){
+      coords <- rbind(coords, data.frame(
+        x = obj$Evol[[j]][i, 1],
+        y = obj$Evol[[j]][i, 2],
+        animal = i,
+        step = j
+      ))
+    }
+    tracks_df <- rbind(tracks_df, coords)
+  }
+  
+  # Adiciona a última posição de cada animal
+  end_points_df <- data.frame()
+  
+  for(i in 1:n){
+    end_points_df <- rbind(end_points_df, data.frame(
+      x = obj$Evol[[time.step]][i, 1],
+      y = obj$Evol[[time.step]][i, 2],
+      animal = i
+    ))
+  }
+  
+  # dicionário de classes e cores
+  dic <- biomastats:::dict_build()
+  raster <- r
+  dd <- data.frame(table(raster::getValues(raster)))
+  colnames(dd) <- c("class", "area")
+  names_classes <- NULL
+  cores_classes <- NULL
+  for (j in 1:length(dd$class)) {
+    pos <- dd$class[j] == dic$code
+    names_classes[j] <- dic$class[pos]
+    cores_classes[j] <- dic$color[pos]
+  }
+  raster <- as(raster, "SpatialPixelsDataFrame")
+  dat <- as.data.frame(raster)
+  names(dat) <- c("value", "x", "y")
+  p <- ggplot2::ggplot(data = dat, ggplot2::aes(x = x, y = y, 
+                                                fill = factor(value))) + ggplot2::geom_tile() +
+    ggplot2::scale_fill_manual(values = cores_classes, name = "Land Uses", 
+                               labels = names_classes, guide = ggplot2::guide_legend(reverse = TRUE)) +
+    ggplot2::geom_point(data = end_points_df, aes(x = x, y = y), color = "red", size = 2, inherit.aes = FALSE) + 
+    ggplot2::geom_path(data = tracks_df, aes(x = x, y = y, group = animal), color = "black", linewidth = 0.5,inherit.aes = FALSE) 
+  p  
+  
+
+  } # fim else   
+
 } # fim for tracks viewer
 
 traces.viewer<-function(obj=NULL, r=NULL){
