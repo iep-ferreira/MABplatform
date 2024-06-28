@@ -50,7 +50,7 @@ Usando o programa bioma stats.
   - Delimitação da área
   
 ```{r}
-make_polygon(lat = -23.6, lon = -48.5, size = 1, shape = "square")
+make_polygon(lat = -23.59, lon = -48.47, size = 3, shape = "square")
 (path_package <- system.file(package = "biomastats"))
 ```
 
@@ -106,7 +106,7 @@ plot(mapa_bioma)
 ```{r}
 # ra <- land$raster
 ra <- mapa_bioma
-mov <- animal.mov(n = 20, ra = ra , time = 21, where = "resource")
+mov <- animal.mov(n = 40, ra = ra , time = 21, where = "resource")
 ```
 
 
