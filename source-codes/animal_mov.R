@@ -1,114 +1,4 @@
-# source codes - R functions
-
-land.create <- function(l.size = 100, n.patches = c(2, 2, 2), cover = c(0.25, 0.25, 0.25)){
-  
-  # Cria valores de qualidade / recursos 
-  val <- c(1, 3, 7)
-  
-  # Cover = cobertura de cada tipo de paisagem (soma < 1)
-  if( sum(cover) > 1 ){print("Erro. Cobertura total não pode ser maior do que 1"); break}
-  
-  # Total de recursos 
-  t.r <- val %*% cover
-  
-  #### Criando a matriz de recurso ####
-  
-  # criando uma paisagem vazia - só com zeros
-  m <- matrix(0, l.size, l.size) # the empty landscape
-  
-  # transformando a matriz em raster
-  r <- raster(m, xmn=0, xmx=l.size, ymn=0, ymx=l.size)
-  
-  # cria sobre o raster r manchas disjuntas que 
-  # representam fragmentos pobres (i=1), 
-  # intermediários (i=2) e ricos (i=3)
-  for(i in 1:length(cover)){
-    r <- makeClass(r, n.patches[i],
-                   round(cover[i]*l.size^2/n.patches[i]), val = val[i])
-  }
-  
-  # retorna o que é importante
-  return( list("raster"=r,"recursos"=t.r) )
-  
-} # fim da função land.create
-
-update_mov <- function(M = M, time.step = time.step, time.step.adapt = time.step.adapt,
-                       l = l, r = r){
-  
-  R <- NULL
-  MAUX <- M
-  R[[1]] <- M
-  n <- dim(M)[1]
-  
-  # classificações de uso e ocupação
-  classe <- 1:62
-  # peso - qualidade de ocupação
-  weights_classes <- rep(0.1, 62) 
-  weights_classes[3] <- 10 # floresta natural 
-  weights_classes[9] <- 8 # floresta plantada
-  weights_classes[11] <- 7 # áreas alagadas
-  weights_classes[15] <- 2 # pastagens 
-  weights_classes[21] <- 3 # mosaico de usos
-  weights_classes[33] <- 1 # corpos hídricos
-  # consideramos a movimentação no período produtivo
-  weights_classes[39] <- 3 # soja
-  weights_classes[41] <- 4 # outros cultivos temporários
-  
-  traces<-NULL
-  for(j in 2:time.step){ 
-    
-    # Atualização 
-    for(i in 1:n){ 
-      x<-M[i,1]; y<-M[i,2]
-      
-      if(j>time.step.adapt&j%%6==0){traces<-rbind(traces,c(x,y))}
-      
-      if(x==1|x==l|y==1|y==l){
-        yaux<-y; xaux<-x
-        
-        if(x==1){xaux<-x+1}
-        if(x==l){xaux<-x-1}
-        
-        if(y==1){yaux<-y+1}
-        if(y==l){yaux<-y-1}
-        
-        MAUX[i,]<-c(xaux,yaux)
-      } else{
-        
-        # atualização dentro da matriz
-        v.aux<-c(r[x-1,y+1],r[x,y+1],r[x+1,y+1], 
-                 r[x-1,y],r[x,y],r[x+1,y],
-                 r[x-1,y-1],r[x,y-1],r[x+1,y-1])
-        v.weights <- weights_classes[v.aux]
-        if(sum(v.aux)>0){
-          p.weights <- v.weights/sum(v.weights) # normalização dos pesos 
-          cl<-sample(1:9, 1, prob = p.weights)
-        } else{
-          cl<-sample(1:9,1)
-        } 
-        
-        switch(cl,
-               MAUX[i,]<-c(x-1,y+1), 
-               MAUX[i,]<-c(x,y+1),
-               MAUX[i,]<-c(x+1,y+1),
-               MAUX[i,]<-c(x-1,y),
-               MAUX[i,]<-c(x,y),
-               MAUX[i,]<-c(x+1,y),
-               MAUX[i,]<-c(x-1,y-1),
-               MAUX[i,]<-c(x,y-1),
-               MAUX[i,]<-c(x+1,y-1),
-        )
-        
-      } # fim else 
-    } # fim i
-    M<-MAUX      
-    R[[j]]<-M
-  } # fim j   
-  
-  return(list("R"= R, "traces" = traces))
-} # fim update for movements
-
-animal.mov <- function( n = 100, ra = NULL, time = 21, where = "random"){
+animal_mov <- function( n = 100, ra = NULL, time = 21, where = "random", landscape_on = TRUE){
   
   # Time in weeks (20 adaptation + 1 experiment)
   if(time<=1){print("Error. At least two weeks are necessary!"); break}
@@ -139,6 +29,7 @@ animal.mov <- function( n = 100, ra = NULL, time = 21, where = "random"){
       # posição inicial dos indíviduos (x_0, y_0)
       
       sample_coords <- sample(1:l,2*n,replace=TRUE)
+      #message("passou!/n")
       
       M <- matrix(sample_coords, ncol=2)
       
@@ -148,7 +39,8 @@ animal.mov <- function( n = 100, ra = NULL, time = 21, where = "random"){
       coords<-NULL
       for(i in 2:(l-1)){
         for(j in 2:(l-1)){
-          if(r[i,j]>0){coords<-rbind(coords,c(i,j))}  
+          # vamos trabalhar com outras formas de alocação (fazer revisão)
+          if(r[i,j]==3|r[i,j]==9){coords<-rbind(coords,c(i,j))}  
           # coords são os pontos onde tem recurso
         } # end for 1 
       } # end for 2
@@ -165,7 +57,8 @@ animal.mov <- function( n = 100, ra = NULL, time = 21, where = "random"){
   }  
   
   # Atualizando as posições
-  result <- update_mov(M, time.step, time.step.adapt, l, r)
+  result <- update_mov(M, time.step, time.step.adapt, l, r, landscape_on)
+  
   
   # return from function R, traces
   

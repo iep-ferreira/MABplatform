@@ -21,12 +21,17 @@ library(landscapeR)
 library(biomastats)
 library(sf)
 library(mapview)
+library(ggplot2)
 ```
 
 ## Carrega as funções através do código-fonte
 
 ```{r}
-source("./source-codes/functions.R")
+carrega <- function(){
+source("./source-codes/land_create.R")
+source("./source-codes/animal_mov.R")
+source("./source-codes/update_mov.R")
+}
 ```
 
 ## Função que cria o ambiente aleatório (paisagem)
@@ -39,7 +44,7 @@ O usuário pode configurar o tamanho da rede ``l.size``, o *vetor* número de fr
 
 ```{r}
 # Criando a Paisagem
-land <- land.create(l.size = 500, n.patches =  c(1, 2, 3), cover = c(0.20,0.15,0.30))
+land <- land_create(l.size = 500, n.patches =  c(1, 2, 3), cover = c(0.20,0.15,0.30))
 plot(land$raster)
 ```
 
@@ -62,10 +67,8 @@ mapview(sf::read_sf(shp_path))
   - Download dos mapas de uso e ocupação para algum ano de interesse
 
 ```{r}
-data_maps <- load_rasters(shape_path = shp_path, start=1985, end=2020, data_from = "example")
+data_maps <- load_rasters(shape_path = shp_path, start=1985, end=2020, data_from = "download")
 ```
-
-  Obs: Urgente: coorigir no bioma stats > função land_vis Error in data$raster[[year - 1984]] : subscript out of bounds
 
 ```{r}
 land_vis(data_maps, year = 2020)
@@ -106,7 +109,8 @@ plot(mapa_bioma)
 ```{r}
 # ra <- land$raster
 ra <- mapa_bioma
-mov <- animal.mov(n = 40, ra = ra , time = 21, where = "resource")
+carrega()
+mov <- animal_mov(n = 40, ra = ra , time = 21, where = "resource", landscape_on = TRUE)
 ```
 
 
