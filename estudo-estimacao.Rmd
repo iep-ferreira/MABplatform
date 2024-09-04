@@ -33,8 +33,11 @@ library(unmarked)
 
 ### Preparação dos dados
 
+
 ```{r}
 umf_abund <- unmarkedFramePCount(y = detections)
+# teste
+## umf_abund <- unmarkedFramePCount(y = matrix(c(2,1,1,1)))
 ```
 
 ### Modelo sem covariáveis

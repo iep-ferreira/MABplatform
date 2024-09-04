@@ -31,7 +31,9 @@ carrega <- function(){
 source("./source-codes/land_create.R")
 source("./source-codes/animal_mov.R")
 source("./source-codes/update_mov.R")
+source("./source-codes/tracks_viewer.R")
 }
+carrega()
 ```
 
 ## Função que cria o ambiente aleatório (paisagem)
@@ -66,8 +68,15 @@ mapview(sf::read_sf(shp_path))
 
   - Download dos mapas de uso e ocupação para algum ano de interesse
 
+Obs: houve erro na hora de baixar a quadrícula 93. Pq????
+
 ```{r}
-data_maps <- load_rasters(shape_path = shp_path, start=1985, end=2020, data_from = "download")
+##data_maps 
+teste <- load_rasters(shape_path = shp_path, start=1985, end=2020, data_from = "download")
+```
+
+```{r}
+obj <- biomastats:::post_to_biomastats(91, 1985)
 ```
 
 ```{r}
@@ -110,18 +119,50 @@ plot(mapa_bioma)
 # ra <- land$raster
 ra <- mapa_bioma
 carrega()
-mov <- animal_mov(n = 40, ra = ra , time = 21, where = "resource", landscape_on = TRUE)
+mov <- animal_mov(n = 500, ra = ra , time = 3, where = "resource", landscape_on = TRUE, n_camera = 4)
 ```
 
 
+```{r}
+mov$count_table
+```
+
+## Analisando os resultados com N-mixture
+
+```{r}
+library(unmarked)
+umf_abund <- unmarkedFramePCount(y = mov$count_table[,-1])
+abund_model <- pcount(~ 1 ~ 1, data = umf_abund, mixture = "NB")
+exp(coef(abund_model))
+```
+
+```{r}
+#Estimativa da abundância (Lambda) no modelo de N-mixture
+(abund_lambda <- backTransform(abund_model, "state"))
+```
+
+
+## Posição das câmeras
+
+
+```{r}
+mov$cam_position
+```
+
+
+## Registros contabilizados
+
+```{r}
+```
+
 ## Para visualizar a movimentação animal 
    
-   + Com ``adapt = FALSE`` visualizamos apenas as duas semanas finais; 
+   + Com ``adapt = FALSE`` visualizamos apenas as cinco semanas finais; 
    
    + Com ``adapt = TRUE`` visualizamos todas as semanas, incluindo a fase de adaptação. 
 
 ```{r}
-tracks.viewer(obj = mov, r = ra)
+tracks.viewer(obj = mov, r = ra, adapt = FALSE)
 ```
 
 

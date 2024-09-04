@@ -1,5 +1,5 @@
 update_mov <- function(M = M, time.step = time.step, time.step.adapt = time.step.adapt,
-                       l = l, r = r, landscape_on = TRUE){
+                       l = l, r = r, landscape_on = TRUE, M_CAM){
   
   R <- NULL
   MAUX <- M
@@ -21,13 +21,29 @@ update_mov <- function(M = M, time.step = time.step, time.step.adapt = time.step
   weights_classes[41] <- 4 # outros cultivos temporários
   
   traces<-NULL
+  registro <- NULL
   for(j in 2:time.step){ 
     
+    if(j>time.step.adapt){
+      # considerando probabilidade de detecção de 100%
+      for(k in 1:dim(M_CAM)[1]){
+        linha <- M_CAM[k,]
+        # Comparando cada linha da matriz com o vetor
+        linhas_iguais <- apply(M, 1, function(aux_linha) all(aux_linha == linha))
+        # Contabilizando quantas linhas são iguais ao vetor
+        contagem <- sum(linhas_iguais)
+        registro <- rbind(registro, cbind(k, j, contagem) )
+      }
+    }
+    
+  
     # Atualização 
     for(i in 1:n){ 
       x<-M[i,1]; y<-M[i,2]
       
-      if(j>time.step.adapt&j%%6==0){traces<-rbind(traces,c(x,y))}
+      #if(j>time.step.adapt){
+      # traces<-rbind(traces,c(x,y))
+      #}
       
       if(x==1|x==l|y==1|y==l){
         yaux<-y; xaux<-x
@@ -81,6 +97,7 @@ update_mov <- function(M = M, time.step = time.step, time.step.adapt = time.step
     R[[j]]<-M
   } # fim j   
   
+## names(registro) <- c("Camera_id", "Time", "Counts")  
   
-  return(list("R"= R, "traces" = traces))
+  return(list("R"= R, "traces" = traces, "registros" = registro ))
 } # fim update for movements

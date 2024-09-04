@@ -1,12 +1,14 @@
-animal_mov <- function( n = 100, ra = NULL, time = 21, where = "random", landscape_on = TRUE){
+animal_mov <- function( n = 100, ra = NULL, time = 5, where = "random", landscape_on = TRUE, n_camera = 4){
+  
+  # sempre 20 semanas de adaptação
   
   # Time in weeks (20 adaptation + 1 experiment)
   if(time<=1){print("Error. At least two weeks are necessary!"); break}
   
-  # Total de tempo gasto nas simulações (em horas)
-  time.step<-round(time)*7*24
-  # Tempo total de adaptação (em horas)
-  time.step.adapt<-(round(time)-1)*7*24
+  # Total de tempo gasto nas simulações (em h)
+  time.step<-round(20+time)*7*24
+  # Tempo total de adaptação (em h)
+  time.step.adapt<-20*7*24
   
   # Número de animais (n)
   # r = valores do raster (formato de matriz)
@@ -21,6 +23,11 @@ animal_mov <- function( n = 100, ra = NULL, time = 21, where = "random", landsca
   
   # Gera coordenadas inicias x e y para cada 
   # um dos n indivíduos simulados
+  
+  # Onde tem camera? 
+  
+  cam_coords <- sample(3:l-3,2*n_camera,replace=TRUE)
+  M_CAM <- matrix(cam_coords, ncol=2)
   
   # Aleatoriamente ou só onde tem recursos?
   if(where=="random"||where=="resource"){
@@ -57,159 +64,85 @@ animal_mov <- function( n = 100, ra = NULL, time = 21, where = "random", landsca
   }  
   
   # Atualizando as posições
-  result <- update_mov(M, time.step, time.step.adapt, l, r, landscape_on)
-  
+  result <- update_mov(M, time.step, time.step.adapt, l, r, landscape_on, M_CAM)
   
   # return from function R, traces
   
-  return(list("Evol"=result$R,"Traces"=result$traces,"time.step"=time.step,"time.step.adapt"=time.step.adapt))
+  # Exibindo o resultado
+  #counts_wide <- NULL
+  
+  #mov$registros
+  counts_summarised <- data.frame(result$registros)
+  ####counts_summarised <- data.frame(mov$registros)
+  counts_summarised$week <- round(counts_summarised$j/(24*7))
+  counts_summarised <- counts_summarised %>% dplyr::group_by(k, week) %>% dplyr::summarise(counts = sum(contagem)) %>%
+    dplyr::ungroup()
+  
+  counts_wide <- counts_summarised %>% tidyr::pivot_wider(names_from = week, values_from = counts, values_fill = 0)
+  
+  
+  return(list("Evol"=result$R,"Traces"=result$traces,"time.step"=time.step,"time.step.adapt"=time.step.adapt, 
+              "registros" = result$registros, "count_table" = counts_wide, "cam_position" = M_CAM))
 } # fim for animal movements
 
-tracks.viewer<-function(obj=NULL, r=NULL, adapt=FALSE, biomastats_std = TRUE){
-  if(is.null(obj)){print("Erro. Inserir os resultados da simulação"); break}
-  # r = valores do raster (formato de matriz)
-  if(is.null(r)){print("Erro. Inserir os valores do raster no segundo argumento"); break}
-  
-  # number of animals / tracks
-  n<-dim(obj$Evol[[1]])[1]
-  time.step<-obj$time.step
-  time.step.adapt<-obj$time.step.adapt
-  tracks<-NULL
-  for(i in 1:n){
-    coords<-NULL
-    for(j in 1:time.step){
-      coords<-rbind(coords,obj$Evol[[j]][i,])
-    }
-    tracks[[i]]<-coords
-  }
 
-if(biomastats_std == FALSE){  
-  
-  if(adapt==FALSE){
-    plot(flip(t(r),direction='y'))+
-      for(i in 1:n) lines(tracks[[i]][(time.step.adapt+1):time.step,],type='l',cex=0.05,col=1)+
-      points(tracks[[i]][time.step,1],tracks[[i]][time.step,2],cex=0.8, col=2, pch=19)} 
-  else{
-    plot(flip(t(r),direction='y'))+for(i in 1:n) lines(tracks[[i]][1:time.step.adapt,],type='l',cex=0.05,col=4) + lines(tracks[[i]][(time.step.adapt+1):time.step,],type='l',cex=0.05,col=1) 
-    points(tracks[[i]][time.step,1],tracks[[i]][time.step,2],cex=0.8,col=2,pch=19)                                                                                                                                 }
 
-} else{
-  
-  tracks_df <- data.frame()
-  
-  for(i in 1:n){
-    coords <- data.frame(
-      x = numeric(),
-      y = numeric(),
-      animal = integer(),
-      step = integer()
-    )
-    for(j in (time.step.adapt+1):time.step){
-      coords <- rbind(coords, data.frame(
-        x = obj$Evol[[j]][i, 1],
-        y = obj$Evol[[j]][i, 2],
-        animal = i,
-        step = j
-      ))
-    }
-    tracks_df <- rbind(tracks_df, coords)
-  }
-  
-  # Adiciona a última posição de cada animal
-  end_points_df <- data.frame()
-  
-  for(i in 1:n){
-    end_points_df <- rbind(end_points_df, data.frame(
-      x = obj$Evol[[time.step]][i, 1],
-      y = obj$Evol[[time.step]][i, 2],
-      animal = i
-    ))
-  }
-  
-  # dicionário de classes e cores
-  dic <- biomastats:::dict_build()
-  raster <- r
-  dd <- data.frame(table(raster::getValues(raster)))
-  colnames(dd) <- c("class", "area")
-  names_classes <- NULL
-  cores_classes <- NULL
-  for (j in 1:length(dd$class)) {
-    pos <- dd$class[j] == dic$code
-    names_classes[j] <- dic$class[pos]
-    cores_classes[j] <- dic$color[pos]
-  }
-  raster <- as(raster, "SpatialPixelsDataFrame")
-  dat <- as.data.frame(raster)
-  names(dat) <- c("value", "x", "y")
-  p <- ggplot2::ggplot(data = dat, ggplot2::aes(x = x, y = y, 
-                                                fill = factor(value))) + ggplot2::geom_tile() +
-    ggplot2::scale_fill_manual(values = cores_classes, name = "Land Uses", 
-                               labels = names_classes, guide = ggplot2::guide_legend(reverse = TRUE)) +
-    ggplot2::geom_point(data = end_points_df, aes(x = x, y = y), color = "red", size = 2, inherit.aes = FALSE) + 
-    ggplot2::geom_path(data = tracks_df, aes(x = x, y = y, group = animal), color = "black", linewidth = 0.5,inherit.aes = FALSE) 
-  p  
-  
-
-  } # fim else   
-
-} # fim for tracks viewer
-
-traces.viewer<-function(obj=NULL, r=NULL){
-  if(is.null(obj)){print("Erro. Inserir os resultados da simulação"); break}
-  # r = valores do raster (formato de matriz)
-  if(is.null(r)){print("Erro. Inserir os valores do raster no segundo argumento"); break}
-  #flip(t(rtest),direction='y')
-  plot(flip(t(r),direction='y'))+points(obj$Traces,cex=0.3,pch=19,col=1)
-}
-
-tracks.set<-function(obj = NULL, ra = NULL, l = 30, sampling = "random", loc = NULL, con = 0.01){
-  # ntracks = number of transects
-  # l = length of transects 
-  # w = width of transects  
-  # r = valores do raster (formato de matriz)
-  if(is.null(obj)){print("Erro. Inserir o objeto tipo animal.mov"); break}
-  
-  
-  if(is.null(ra)){print("Erro. Inserir os valores do raster no segundo argumento"); break}
-  
-  ll<-dim(ra)[1]
-  
-  dir <- runif(1, 0, 360)
-  #if(is.null(loc)){loc<-round(runif(2,ll/9,ll*8/9))}  
-  
-  if(sampling=="random"||sampling=="convenience"){
-    if(sampling=="random"){
-      # spt = NULL -> then random locations
-      m <- matrix(0, ll, ll) # the empty landscape
-      r <- raster(m, xmn=0, xmx=ll, ymn=0, ymx=ll)
-      rtest <- makeLine(r, size = l, direction = dir, convol = con, spt = loc, edge = FALSE, bgr=0, rast = TRUE, val = 10)
-    } else{
-      rtest <- makeLine(ra, size = l, direction = dir, convol = con, spt = loc, edge = FALSE, bgr=7, rast = TRUE, val = 10)  
-    } # end first else
-  } else{
-    print("Error. Sampling design must be at random or by convenience")
-  } # end second else
-  
-  
-  area.t<-sum(values(rtest,format="matrix")==10)
-  coverage<-area.t/(ll^2)
-  coord<-NULL
-  for(i in 1:ll){
-    for(j in 1:ll){
-      if(rtest[i,j]==10){coord<-rbind(coord,c(i,j))}
-    }
-  }
-  
-  traces<-obj$Traces
-  counts<-0
-  for(k in 1:dim(traces)[1]){
-    if(rtest[traces[k,1],traces[k,2]]==10){counts<-counts+1}  
-  }
-  
-  plot(flip(t(ra),direction='y'))+points(coord[,1],coord[,2],col="blue",pch=15,type="p",xlim=c(0,ll),ylim=c(0,ll),cex=0.5)+points(traces,pch=15,cex=0.2)
-  return(list("transect"=rtest,"coverage"=coverage,"area"=area.t,
-              "counts"=counts))
-}
+# traces.viewer<-function(obj=NULL, r=NULL){
+#   if(is.null(obj)){print("Erro. Inserir os resultados da simulação"); break}
+#   # r = valores do raster (formato de matriz)
+#   if(is.null(r)){print("Erro. Inserir os valores do raster no segundo argumento"); break}
+#   #flip(t(rtest),direction='y')
+#   plot(flip(t(r),direction='y'))+points(obj$Traces,cex=0.3,pch=19,col=1)
+# }
+# 
+# tracks.set<-function(obj = NULL, ra = NULL, l = 30, sampling = "random", loc = NULL, con = 0.01){
+#   # ntracks = number of transects
+#   # l = length of transects 
+#   # w = width of transects  
+#   # r = valores do raster (formato de matriz)
+#   if(is.null(obj)){print("Erro. Inserir o objeto tipo animal.mov"); break}
+#   
+#   
+#   if(is.null(ra)){print("Erro. Inserir os valores do raster no segundo argumento"); break}
+#   
+#   ll<-dim(ra)[1]
+#   
+#   dir <- runif(1, 0, 360)
+#   #if(is.null(loc)){loc<-round(runif(2,ll/9,ll*8/9))}  
+#   
+#   if(sampling=="random"||sampling=="convenience"){
+#     if(sampling=="random"){
+#       # spt = NULL -> then random locations
+#       m <- matrix(0, ll, ll) # the empty landscape
+#       r <- raster(m, xmn=0, xmx=ll, ymn=0, ymx=ll)
+#       rtest <- makeLine(r, size = l, direction = dir, convol = con, spt = loc, edge = FALSE, bgr=0, rast = TRUE, val = 10)
+#     } else{
+#       rtest <- makeLine(ra, size = l, direction = dir, convol = con, spt = loc, edge = FALSE, bgr=7, rast = TRUE, val = 10)  
+#     } # end first else
+#   } else{
+#     print("Error. Sampling design must be at random or by convenience")
+#   } # end second else
+#   
+#   
+#   area.t<-sum(values(rtest,format="matrix")==10)
+#   coverage<-area.t/(ll^2)
+#   coord<-NULL
+#   for(i in 1:ll){
+#     for(j in 1:ll){
+#       if(rtest[i,j]==10){coord<-rbind(coord,c(i,j))}
+#     }
+#   }
+#   
+#   traces<-obj$Traces
+#   counts<-0
+#   for(k in 1:dim(traces)[1]){
+#     if(rtest[traces[k,1],traces[k,2]]==10){counts<-counts+1}  
+#   }
+#   
+#   plot(flip(t(ra),direction='y'))+points(coord[,1],coord[,2],col="blue",pch=15,type="p",xlim=c(0,ll),ylim=c(0,ll),cex=0.5)+points(traces,pch=15,cex=0.2)
+#   return(list("transect"=rtest,"coverage"=coverage,"area"=area.t,
+#               "counts"=counts))
+# }
 
 
 
