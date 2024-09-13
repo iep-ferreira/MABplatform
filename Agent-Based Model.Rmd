@@ -22,6 +22,22 @@ library(biomastats)
 library(sf)
 library(mapview)
 library(ggplot2)
+library(unmarked)
+```
+## para a correção do estimador do N-Mixture
+
+```{r}
+# função soma de indíviduos que entram no pixel da câmera com base na densidade populacional
+soma <- function(n){
+  if(n<=1){stop("Error.")}
+aux <- 0
+for(r in 0:(n-1)){
+  aux <- aux + (2*r+1)*(1-exp(-n/(r+1)^2))
+}
+return(aux)
+}
+# teste
+soma(500)
 ```
 
 ## Carrega as funções através do código-fonte
@@ -72,21 +88,20 @@ Obs: houve erro na hora de baixar a quadrícula 93. Pq????
 
 ```{r}
 ##data_maps 
-teste <- load_rasters(shape_path = shp_path, start=1985, end=2020, data_from = "download")
+#teste <- load_rasters(shape_path = shp_path, start=1985, end=2020, data_from = "download")
+#meu_raster <- teste$raster[[30]]
+#writeRaster(meu_raster, filename="raster.tiff", format="GTiff", overwrite=TRUE)
 ```
 
-```{r}
-obj <- biomastats:::post_to_biomastats(91, 1985)
-```
 
 ```{r}
-land_vis(data_maps, year = 2020)
+#land_vis(data_maps, year = 2020)
 ```
 
  - Atribui o mapa da `função_vis` ao objeto `land` 
 
 ```{r}
-mapa <- data_maps$raster[[35]]
+mapa <- raster("./raster.tiff")
 lado <- dim(mapa)[1]
 
 # criando uma paisagem vazia - só com zeros
@@ -119,20 +134,18 @@ plot(mapa_bioma)
 # ra <- land$raster
 ra <- mapa_bioma
 carrega()
-mov <- animal_mov(n = 500, ra = ra , time = 3, where = "resource", landscape_on = TRUE, n_camera = 4)
+mov <- animal_mov(n = 100, ra = ra , time = 3, where = "resource", landscape_on = FALSE, n_camera = 10)
 ```
-
-
 ```{r}
 mov$count_table
 ```
 
+
 ## Analisando os resultados com N-mixture
 
 ```{r}
-library(unmarked)
 umf_abund <- unmarkedFramePCount(y = mov$count_table[,-1])
-abund_model <- pcount(~ 1 ~ 1, data = umf_abund, mixture = "NB")
+abund_model <- pcount(~ 1 ~ 1, data = umf_abund)
 exp(coef(abund_model))
 ```
 
@@ -140,6 +153,103 @@ exp(coef(abund_model))
 #Estimativa da abundância (Lambda) no modelo de N-mixture
 (abund_lambda <- backTransform(abund_model, "state"))
 ```
+
+### Correção
+
+
+```{r}
+lambda_corrigido <- exp(coef(abund_model)[1])*lado^2 / (pi*soma(7*24)) 
+lambda_corrigido
+```
+
+## Loop para avaliar a performance do estimador
+
+
+```{r}
+ra <- mapa_bioma
+estima_testes <- function(sim, true_value, time_span, n_camera){ 
+est_vector <- NULL
+prob_est <- NULL
+n_mixt_est <- NULL
+cam_positions <- NULL
+
+for(i in 1:sim){
+
+mov <- animal_mov(n = true_value, ra = ra, time = time_span, where = "resource", landscape_on = FALSE, n_camera = n_camera)
+# Criação do objeto unmarkedFramePCount
+umf_abund <- unmarkedFramePCount(y = mov$count_table[,-1])
+# Modelo de abundância com pcount
+abund_model <- pcount(~ 1 ~ 1, data = umf_abund)
+est_vector[i] <- exp(coef(abund_model)[1])*lado^2 / (pi*soma(time_span*7*24))
+prob_est[i] <- exp(coef(abund_model)[2])
+n_mixt_est[i] <- exp(coef(abund_model)[1]) 
+cam_positions[[i]] <- mov$cam_position
+}
+
+return(list("simulacoes" = sim,
+            "time_span" = time_span,
+            "number_camera" = n_camera,
+            "true_population" = true_value, 
+            "corrected_estimates" = est_vector,
+            "n_mixt_est" = n_mixt_est,
+            "detection_prob" = prob_est, 
+            "camera_position" = cam_positions) 
+       )
+
+}
+```
+
+
+```{r}
+simu <- estima_testes(sim =5, true_value = 200, time_span = 1, n_camera = 1)
+```
+
+
+```{r}
+summary(round(simu$corrected_estimates, 2))
+summary(round(simu$n_mixt_est, 2))
+simu$detection_prob
+```
+
+
+
+Parei aqui!!!
+
+### visualizando as trajetórias
+
+```{r}
+tracks.viewer(obj = mov, r = ra, adapt = FALSE)
+```
+
+## Estimando a distância da casa (home range)
+
+```{r}
+#install.packages("adehabitatHR")
+library(adehabitatHR)
+
+# Suponha que você tenha coordenadas de localização de um animal
+x <- mov$Evol[[1]]
+
+-c(1:19*7*24)
+
+locs <- data.frame(x = runif(100, min = 0, max = 100), 
+                   y = runif(100, min = 0, max = 100))
+
+# Transformar para classe SpatialPoints
+sp_locs <- SpatialPoints(locs)
+
+# Estimar o home range com KDE
+kde <- kernelUD(sp_locs)
+
+# Calcular o home range com 95% de probabilidade
+hr95 <- getverticeshr(kde, percent = 95)
+
+# Plotar o home range
+plot(hr95)
+```
+
+
+
 
 
 ## Posição das câmeras

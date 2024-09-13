@@ -3,7 +3,7 @@ animal_mov <- function( n = 100, ra = NULL, time = 5, where = "random", landscap
   # sempre 20 semanas de adaptação
   
   # Time in weeks (20 adaptation + 1 experiment)
-  if(time<=1){print("Error. At least two weeks are necessary!"); break}
+  if(time<1){print("Error. At least two weeks are necessary!"); break}
   
   # Total de tempo gasto nas simulações (em h)
   time.step<-round(20+time)*7*24
