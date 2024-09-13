@@ -110,7 +110,7 @@ novo_mapa <- matrix(getValues(mapa), lado, lado, byrow = TRUE) # the empty lands
 # transformando a matriz em raster
 mapa_bioma <- raster(novo_mapa, xmn=0, xmx=lado, ymn=0, ymx=lado)
 
-plot(mapa_bioma)
+#plot(mapa_bioma)
 ```
 
 ## Movimentação dos animais 
@@ -134,8 +134,9 @@ plot(mapa_bioma)
 # ra <- land$raster
 ra <- mapa_bioma
 carrega()
-mov <- animal_mov(n = 100, ra = ra , time = 3, where = "resource", landscape_on = FALSE, n_camera = 10)
+mov <- animal_mov(n = 400, ra = ra , time = 2, where = "resource", landscape_on = FALSE, n_camera = 2)
 ```
+
 ```{r}
 mov$count_table
 ```
@@ -180,7 +181,7 @@ mov <- animal_mov(n = true_value, ra = ra, time = time_span, where = "resource",
 umf_abund <- unmarkedFramePCount(y = mov$count_table[,-1])
 # Modelo de abundância com pcount
 abund_model <- pcount(~ 1 ~ 1, data = umf_abund)
-est_vector[i] <- exp(coef(abund_model)[1])*lado^2 / (pi*soma(time_span*7*24))
+est_vector[i] <- exp(coef(abund_model)[1])*lado^2 / (pi*soma(7*24))
 prob_est[i] <- exp(coef(abund_model)[2])
 n_mixt_est[i] <- exp(coef(abund_model)[1]) 
 cam_positions[[i]] <- mov$cam_position
@@ -201,7 +202,7 @@ return(list("simulacoes" = sim,
 
 
 ```{r}
-simu <- estima_testes(sim =5, true_value = 200, time_span = 1, n_camera = 1)
+simu <- estima_testes(sim=10, true_value = 500, time_span = 1, n_camera = 1)
 ```
 
 

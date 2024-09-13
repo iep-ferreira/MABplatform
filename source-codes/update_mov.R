@@ -22,7 +22,7 @@ update_mov <- function(M = M, time.step = time.step, time.step.adapt = time.step
   
   traces<-NULL
   registro <- NULL
-  for(j in 2:time.step){ 
+  for(j in 2:(time.step-1)){ 
     
     if(j>time.step.adapt){
       # considerando probabilidade de detecção de 100%

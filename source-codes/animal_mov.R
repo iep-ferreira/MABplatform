@@ -74,7 +74,7 @@ animal_mov <- function( n = 100, ra = NULL, time = 5, where = "random", landscap
   #mov$registros
   counts_summarised <- data.frame(result$registros)
   ####counts_summarised <- data.frame(mov$registros)
-  counts_summarised$week <- round(counts_summarised$j/(24*7))
+  counts_summarised$week <- floor(counts_summarised$j/(24*7))
   counts_summarised <- counts_summarised %>% dplyr::group_by(k, week) %>% dplyr::summarise(counts = sum(contagem)) %>%
     dplyr::ungroup()
   
