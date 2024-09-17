@@ -126,38 +126,6 @@ Isso está errado. A área da zona de detecção tende a ser muito menor do que 
 ```
 ## Estimador 2
 
-O número médio de animais encontrados em um $px$ em um intervalo de tempo $k$ é dado por  
-
-
-\[
-\mu = \sum_{r = 0}^{k - 1} A(r+1) P(E | r, k) \Big \{1 +  P(R) \Big \}
-\]
-
-em que: $A(r+1)$ é o número esperado de animais no anel que caracteriza a distância $ r < d < r+1 $ do $px$ de referância; 
-$P(E | r, k)$ é a probabilidade de um animal à distância $r$ encontrar, durante o caminho aleatório, o $px$ de referência em um tampo menor ou igual a $k$ e $P(R)$ é a probabilidade de retorno do agente ao pixel de $px$ em até $k$ passos de tempo. Aqui, consideraremos a probabilidade de dois ou mais retornos como negligenciável. 
-
-Considerando um agente em uma grade bidimensional que realiza um random walk, a probabilidade \( P(j) \) de atingir uma célula-alvo a uma distância \( r+1 \) em exatamente \( j \) passos (com \( j \geq r+1 \)) é dada pela fórmula:
-
-\[
-P(j) = \binom{j}{\frac{j - (r+1)}{2}} \left( \frac{1}{4} \right)^{r+1} \left( \frac{3}{4} \right)^{\frac{j - (r+1)}{2}}
-\]
-
-- \( P(j) \): A probabilidade de o agente atingir a célula-alvo exatamente em \( j \) passos.
-
-- \( \binom{j}{\frac{j - (r+1)}{2}} \): O coeficiente binomial conta o número de maneiras de organizar os \( j \) passos, onde \( r+1 \) são passos corretos (movendo-se na direção da célula-alvo) e \( \frac{j - (r+1)}{2} \) são passos "extras", que temporariamente desviam o agente da célula-alvo.
-
-- \( \left( \frac{1}{4} \right)^{r+1} \): Esta é a probabilidade de que o agente faça exatamente \( r+1 \) passos corretos. Em uma grade bidimensional, o agente pode se mover em 4 direções (cima, baixo, esquerda, direita). A probabilidade de mover-se na direção correta é \( \frac{1}{4} \). Como o agente precisa fazer \( r+1 \) passos corretos, a probabilidade é \( \left( \frac{1}{4} \right)^{r+1} \).
-
-- \( \left( \frac{3}{4} \right)^{\frac{j - (r+1)}{2}} \): Esta é a probabilidade de que o agente faça \( \frac{j - (r+1)}{2} \) passos "errados" (movimentos em direções não corretas). A probabilidade de fazer um movimento "errado" em uma grade bidimensional é \( \frac{3}{4} \) (já que há 3 direções incorretas). Portanto, a probabilidade de fazer \( \frac{j - (r+1)}{2} \) passos errados é \( \left( \frac{3}{4} \right)^{\frac{j - (r+1)}{2}} \).
-
-
-
-Dado que a partícula encontrou o $px$ de referência em $j \leq k$ passos de tempo, a probabilidade de retorno é, aproximadamente, 
-
-\[
-P(R) ~ \frac{1}{\pi \, (k - j)}  
-\]
-
 
 
 ```{r}
