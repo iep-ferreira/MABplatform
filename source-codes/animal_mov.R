@@ -1,4 +1,4 @@
-animal_mov <- function( n = 100, ra = NULL, time = 5, where = "random", landscape_on = TRUE, n_camera = 4){
+animal_mov <- function( n = 100, ra = NULL, time = 5, time_adapt = 20, where = "random", landscape_on = TRUE, n_camera = 4){
   
   # sempre 20 semanas de adaptação
   
@@ -6,9 +6,9 @@ animal_mov <- function( n = 100, ra = NULL, time = 5, where = "random", landscap
   if(time<1){print("Error. At least two weeks are necessary!"); break}
   
   # Total de tempo gasto nas simulações (em h)
-  time.step<-round(20+time)*7*24
+  time.step<-round(time_adapt+time)*7*24
   # Tempo total de adaptação (em h)
-  time.step.adapt<-20*7*24
+  time.step.adapt<-time_adapt*7*24
   
   # Número de animais (n)
   # r = valores do raster (formato de matriz)
@@ -26,7 +26,7 @@ animal_mov <- function( n = 100, ra = NULL, time = 5, where = "random", landscap
   
   # Onde tem camera? 
   
-  cam_coords <- sample(3:l-3,2*n_camera,replace=TRUE)
+  cam_coords <- sample(15:l-15,2*n_camera,replace=TRUE)
   M_CAM <- matrix(cam_coords, ncol=2)
   
   # Aleatoriamente ou só onde tem recursos?

@@ -1,0 +1,237 @@
+---
+title: "estudos-movimentacao"
+author: "CeMECA"
+date: "2024-09-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Pacotes / Dependências
+
+```{r}
+#install.packages("landscapeR")
+#install.packages("raster")
+library(raster); library(landscapeR); library(sf);
+library(mapview); library(ggplot2); library(unmarked); 
+library(dplyr)
+```
+
+
+## Carrega as funções através do código-fonte
+
+```{r}
+carrega <- function(){
+source("./source-codes/soma.R")
+source("./source-codes/land_create.R")
+source("./source-codes/animal_mov.R")
+source("./source-codes/update_mov.R")
+source("./source-codes/tracks_viewer.R")
+source("./source-codes/estima_testes.R")
+}
+```
+
+
+ - Atribui o mapa da `função_vis` ao objeto `land` 
+
+```{r}
+mapa <- raster("./raster.tiff")
+lado <- dim(mapa)[1]
+# criando uma paisagem vazia - só com zeros
+novo_mapa <- matrix(getValues(mapa), lado, lado, byrow = TRUE) # the empty landscape
+# transformando a matriz em raster
+mapa_bioma <- raster(novo_mapa, xmn=0, xmx=lado, ymn=0, ymx=lado)
+#plot(mapa_bioma)
+```
+
+## Estudo 1 - Contagens em apenas uma armadilha fotográfica
+
+Vamos assumir que os animais assumem posições aleatórias e que a quantidade de animais encontrados em um pixel dependa do: 
+
+ - Total de animais na rede ($n$); 
+ - Área total da rede ($l^2$); 
+ - O número de passos de tempo ($k$). 
+
+O número de animais em um determinado pixel no tempo $k$ é uma Poisson: 
+
+\[
+Y_k \sim P( \lambda = n/l^2)
+\]
+
+Logo, o total de animais que entram no pixel de referência ao longo de $k$ passos de tempo é: 
+
+\[
+Y \sim P( \lambda = \frac{n ~ k}{l^2})
+\]
+
+### Simulação
+
+Uma simulação como exemplo
+
+
+```{r}
+carrega()
+```
+
+```{r}
+# em km^2
+(area_total <- (900*l^2)/1000000)
+# número de quadrículas por km^2
+(n_q <- 1000000/900)
+# densidade populacional 
+n <- 100
+(densi.pop <- n/area_total) 
+# densidade por quadrícula 
+(lambda_q <- densi.pop/l_q^2)
+# área da quadrícula em km^2
+(a_q <- 900/1000000)
+```
+O valor esperado de contagens seria por pixel, por passo de tempo
+
+```{r}
+n <- 5000
+l <- lado
+k <- 24*7
+( est <- k*n/l^2 )
+```
+
+```{r}
+mov <- animal_mov(n = 5000, ra = ra, time = 1, time_adapt = 0, where = "random", landscape_on = FALSE, n_camera = 2)
+```
+```{r}
+umf_abund <- unmarkedFramePCount(y = mov$count_table[,-1])
+abund_model <- pcount(~ 1 ~ 1, data = umf_abund)
+plogis(coef(abund_model)[2])
+exp(coef(abund_model)[1])
+# p é a média das contagens pela probabilidade de detecção estimada
+# nos cálculos abaixo, vou assumir probabilidade de detecção 1 para 
+# normalizar pela área do pixel
+(m_counts <- exp(coef(abund_model)[1])*plogis(coef(abund_model)[2]) )
+```
+
+## Ajuste pela área da zona de detecção
+
+
+```{r}
+(densi <- exp(coef(abund_model)[1])/ a_q )
+```
+Isso está errado. A área da zona de detecção tende a ser muito menor do que o habitat ou a área explorada durante o período de coletas. Além disso, o cálculo depende da probabilidade de detecção, que é estatisticamente confundida com a abundância média. Basicamente, qualquer valor pode sair dessa operação, e eles não fazem sentido. 
+
+## Estimador 1: Cálculo da densidade a partir da área do pixel e do número de passos de tempos
+
+```{r}
+(dens <- m_counts / (a_q*k))
+```
+## Estimador 2
+
+O número médio de animais encontrados em um $px$ em um intervalo de tempo $k$ é dado por  
+
+
+\[
+\mu = \sum_{r = 0}^{k - 1} A(r+1) P(E | r, k) \Big \{1 +  P(R) \Big \}
+\]
+
+em que: $A(r+1)$ é o número esperado de animais no anel que caracteriza a distância $ r < d < r+1 $ do $px$ de referância; 
+$P(E | r, k)$ é a probabilidade de um animal à distância $r$ encontrar, durante o caminho aleatório, o $px$ de referência em um tampo menor ou igual a $k$ e $P(R)$ é a probabilidade de retorno do agente ao pixel de $px$ em até $k$ passos de tempo. Aqui, consideraremos a probabilidade de dois ou mais retornos como negligenciável. 
+
+Considerando um agente em uma grade bidimensional que realiza um random walk, a probabilidade \( P(j) \) de atingir uma célula-alvo a uma distância \( r+1 \) em exatamente \( j \) passos (com \( j \geq r+1 \)) é dada pela fórmula:
+
+\[
+P(j) = \binom{j}{\frac{j - (r+1)}{2}} \left( \frac{1}{4} \right)^{r+1} \left( \frac{3}{4} \right)^{\frac{j - (r+1)}{2}}
+\]
+
+- \( P(j) \): A probabilidade de o agente atingir a célula-alvo exatamente em \( j \) passos.
+
+- \( \binom{j}{\frac{j - (r+1)}{2}} \): O coeficiente binomial conta o número de maneiras de organizar os \( j \) passos, onde \( r+1 \) são passos corretos (movendo-se na direção da célula-alvo) e \( \frac{j - (r+1)}{2} \) são passos "extras", que temporariamente desviam o agente da célula-alvo.
+
+- \( \left( \frac{1}{4} \right)^{r+1} \): Esta é a probabilidade de que o agente faça exatamente \( r+1 \) passos corretos. Em uma grade bidimensional, o agente pode se mover em 4 direções (cima, baixo, esquerda, direita). A probabilidade de mover-se na direção correta é \( \frac{1}{4} \). Como o agente precisa fazer \( r+1 \) passos corretos, a probabilidade é \( \left( \frac{1}{4} \right)^{r+1} \).
+
+- \( \left( \frac{3}{4} \right)^{\frac{j - (r+1)}{2}} \): Esta é a probabilidade de que o agente faça \( \frac{j - (r+1)}{2} \) passos "errados" (movimentos em direções não corretas). A probabilidade de fazer um movimento "errado" em uma grade bidimensional é \( \frac{3}{4} \) (já que há 3 direções incorretas). Portanto, a probabilidade de fazer \( \frac{j - (r+1)}{2} \) passos errados é \( \left( \frac{3}{4} \right)^{\frac{j - (r+1)}{2}} \).
+
+
+
+Dado que a partícula encontrou o $px$ de referência em $j \leq k$ passos de tempo, a probabilidade de retorno é, aproximadamente, 
+
+\[
+P(R) ~ \frac{1}{\pi \, (k - j)}  
+\]
+
+
+
+```{r}
+## Tem coisa errada aqui!! Rever depois!! 
+## Usando a nossa proposta de correção
+(N_est <- (m_counts)*pi*soma(k))
+(area_influencia_2 <- (k)^2*pi*a_q)
+(n_est_aneis <-  N_est/(area_influencia_2*k)) 
+```
+
+
+Faremos a simulação dos encontros considerando uma câmera, $n$ animais e $k$ passos de tempo.  
+
+```{r}
+# ra <- land$raster
+ra <- mapa_bioma
+carrega()
+mov_5 <- estima_testes(sim = 50, ra = ra, true_value = 800, time = 1, time_adapt = 0, where = "random", landscape_on = FALSE, n_camera = 2)
+```
+
+Salvando resultados da simulação
+
+```{r}
+#save(mov_5, file = "./data_sim/mov_5.RData")
+load("./data_sim/mov_5.RData")
+```
+
+Verificando resultados (O estimador tem que ser ajustado pelo número de semanas)
+
+```{r}
+800/(l^2*a_q)
+round(mov_5$est_um,1)
+mean(mov_5$est_um)
+100*abs(mean(mov_5$est_um)-mov_5$real_pop_density)/mov_5$real_pop_density
+```
+
+```{r}
+mov_5$est_dois
+mean(mov_5$est_dois)
+100*abs(mean(mov_5$est_dois)-mov_5$real_pop_density)/mov_5$real_pop_density
+```
+
+
+
+
+
+
+
+
+O estimado foi:
+
+```{r}
+#mov_teste <- sim_mov(15)
+#(resultados <- lapply(1:15, function(i) sum(mov_teste[[i]]$count_table[1,2])))
+#vetor_resultados <- unlist(resultados)
+#save(vetor_resultados, file = "./data_sim/xxxx.RData")
+load("./data_sim/xxxx.RData")
+mean(vetor_resultados)
+var(vetor_resultados)
+```
+
+A média está parecida, mas a variância excede em muito o esperado pela Poisson. Talvez porque a Poisson estabeleça movimentos independentes, enquanto a movimentação ocorre em um padrão, que é a caminhada aleatória. 
+
+
+## Analisando os resultados com N-mixture
+
+```{r}
+umf_abund <- unmarkedFramePCount(y = t(vetor_resultados))
+# assumindo prob. de detecção 1
+abund_model <- pcount(~ 1 ~ 1, data = umf_abund)
+exp(coef(abund_model))
+```
+
+```{r}
+( est_mod <- exp(coef(abund_model))[2]*exp(coef(abund_model))[1]*l^2/k )
+```
+

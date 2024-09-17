@@ -24,6 +24,7 @@ library(mapview)
 library(ggplot2)
 library(unmarked)
 ```
+
 ## para a correção do estimador do N-Mixture
 
 ```{r}

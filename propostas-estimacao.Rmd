@@ -1,0 +1,47 @@
+---
+title: "estimacao-propostas"
+author: "CeMECA"
+date: "2024-09-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Estimador 1: Cálculo da densidade a partir da área do pixel e do número de passos de tempos
+
+Considere a distribuição dos animais completamente aleatória. Então, o número esperado de animais no pixel em um dado instante é a densidade vezes a área do pixel. Em $k$ passos de tempo, serão contabilizados, na média, $densid. \times área \times k$. Logo, a densidade pode ser calculada como sendo igual $counts / (área_{px} \times k)$. 
+
+## Estimador 2
+
+O número médio de animais encontrados em um $px$ em um intervalo de tempo $k$ é dado por  
+
+
+\[
+\mu = \sum_{r = 1}^{k} A(r) \sum_{j = r}^{k} P(A | r, j) \Big \{1 +  P(R, k-j) \Big \}
+\]
+
+em que: $A(r)$ é o número esperado de animais no anel que caracteriza a distância $ r-1 < d < r $ do $px$ de referência; 
+$P(A | r, j)$ é a probabilidade de atingir o $px$ que está a distância $r$ em, exatamente, $j$ passos de tempo e $P(R)$ é a probabilidade de retorno do agente ao pixel de $px$ em até $k - j$ passos de tempo. Aqui, consideraremos a probabilidade de dois ou mais retornos como negligenciável. 
+
+Considerando um agente em uma grade bidimensional que realiza um random walk, a probabilidade \( P(j) \) de atingir uma célula-alvo a uma distância \( r \) em exatamente \( j \) passos (com \( j \geq r \)) é dada pela fórmula:
+
+\[
+P(j) = \binom{j}{\frac{j - r}{2}} \left( \frac{1}{4} \right)^{r} \left( \frac{3}{4} \right)^{\frac{j - r}{2}}
+\]
+
+- \( P(j) \): A probabilidade de o agente atingir a célula-alvo exatamente em \( j \) passos.
+
+- \( \binom{j}{\frac{j - (r+1)}{2}} \): O coeficiente binomial conta o número de maneiras de organizar os \( j \) passos, onde \( r+1 \) são passos corretos (movendo-se na direção da célula-alvo) e \( \frac{j - (r+1)}{2} \) são passos "extras", que temporariamente desviam o agente da célula-alvo.
+
+- \( \left( \frac{1}{4} \right)^{r+1} \): Esta é a probabilidade de que o agente faça exatamente \( r+1 \) passos corretos. Em uma grade bidimensional, o agente pode se mover em 4 direções (cima, baixo, esquerda, direita). A probabilidade de mover-se na direção correta é \( \frac{1}{4} \). Como o agente precisa fazer \( r+1 \) passos corretos, a probabilidade é \( \left( \frac{1}{4} \right)^{r+1} \).
+
+- \( \left( \frac{3}{4} \right)^{\frac{j - (r+1)}{2}} \): Esta é a probabilidade de que o agente faça \( \frac{j - (r+1)}{2} \) passos "errados" (movimentos em direções não corretas). A probabilidade de fazer um movimento "errado" em uma grade bidimensional é \( \frac{3}{4} \) (já que há 3 direções incorretas). Portanto, a probabilidade de fazer \( \frac{j - (r+1)}{2} \) passos errados é \( \left( \frac{3}{4} \right)^{\frac{j - (r+1)}{2}} \).
+
+Dado que a partícula encontrou o $px$ de referência em $j \leq k$ passos de tempo, a probabilidade de retorno é, aproximadamente, 
+
+\[
+P(R) ~ \frac{1}{\pi \, (k - j)}  
+\]
+
