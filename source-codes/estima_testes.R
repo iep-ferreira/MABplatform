@@ -8,14 +8,14 @@ estima_testes <- function(sim, ra = ra, true_value = true_value, time = time, ti
   # densidade populacional
   (densi.pop <- true_value/area_total) 
   # densidade por quadrícula 
-  (lambda_q <- densi.pop/l_q^2)
+  #(lambda_q <- densi.pop/l_q^2)
   # área da quadrícula em km^2
   a_q <- 900/1000000
   k <- time*7*24
-  numero_magico <- 1.20
-  raio <- sqrt(k)
-  area_influencia <- pi*(numero_magico*raio)^2
-  area_influencia_km <- area_influencia / 1000000 
+  #numero_magico <- 1.20
+  #raio <- sqrt(k)
+  #area_influencia <- pi*(numero_magico*raio)^2
+  #area_influencia_km <- area_influencia / 1000000 
   
   est_um <- NULL
   #prob_est <- NULL
@@ -69,12 +69,12 @@ estima_testes <- function(sim, ra = ra, true_value = true_value, time = time, ti
               "time_steps" = k,
               "square_size" = l,
               "real_pop_density" = densi.pop,
-              "desn.quadricula" = lambda_q,
+              #"desn.quadricula" = lambda_q,
               "total_area" = area_total,
               "area_quadricula" = a_q, 
               "number_camera" = n_camera,
               "true_population" = true_value,
-              "numero_magico" = numero_magico,
+              #"numero_magico" = numero_magico,
               "est_um" = est_um,
               #"est_dois" = est_dois, 
               "lambda_est" = est_lambda,

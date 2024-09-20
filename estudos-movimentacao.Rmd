@@ -77,11 +77,12 @@ carrega()
 
 ```{r}
 # em km^2
+l <- lado
 (area_total <- (900*l^2)/1000000)
 # número de quadrículas por km^2
 (n_q <- 1000000/900)
 # densidade populacional 
-n <- 100
+n <- 500
 (densi.pop <- n/area_total) 
 # densidade por quadrícula 
 (lambda_q <- densi.pop/l_q^2)
@@ -98,21 +99,37 @@ k <- 24*7
 ```
 
 ```{r}
-mov <- animal_mov(n = 5000, ra = ra, time = 1, time_adapt = 0, where = "random", landscape_on = FALSE, n_camera = 2)
+mov <- animal_mov(n = 5000, ra = ra, time = 1, time_adapt = 4, where = "random", landscape_on = TRUE, n_camera = 4)
 ```
 ```{r}
+mov$count_table
+```
+
+```{r}
+5000/area_total
+```
+Usar OCCU do unmarked e REM
+Calcular a posteriori para N 
+
+
+```{r}
 umf_abund <- unmarkedFramePCount(y = mov$count_table[,-1])
-abund_model <- pcount(~ 1 ~ 1, data = umf_abund)
+abund_model <- pcount(~ 1 ~ 1, data = umf_abund, mixture = "NB")
 plogis(coef(abund_model)[2])
 exp(coef(abund_model)[1])
 # p é a média das contagens pela probabilidade de detecção estimada
 # nos cálculos abaixo, vou assumir probabilidade de detecção 1 para 
 # normalizar pela área do pixel
 (m_counts <- exp(coef(abund_model)[1])*plogis(coef(abund_model)[2]) )
+# reformular a esperança para NB - continua a mesma fórmula!!!
+coef(abund_model)
+```
+
+```{r}
+ranef(abund_model)
 ```
 
 ## Ajuste pela área da zona de detecção
-
 
 ```{r}
 (densi <- exp(coef(abund_model)[1])/ a_q )
@@ -124,18 +141,6 @@ Isso está errado. A área da zona de detecção tende a ser muito menor do que 
 ```{r}
 (dens <- m_counts / (a_q*k))
 ```
-## Estimador 2
-
-
-
-```{r}
-## Tem coisa errada aqui!! Rever depois!! 
-## Usando a nossa proposta de correção
-(N_est <- (m_counts)*pi*soma(k))
-(area_influencia_2 <- (k)^2*pi*a_q)
-(n_est_aneis <-  N_est/(area_influencia_2*k)) 
-```
-
 
 Faremos a simulação dos encontros considerando uma câmera, $n$ animais e $k$ passos de tempo.  
 
@@ -143,23 +148,24 @@ Faremos a simulação dos encontros considerando uma câmera, $n$ animais e $k$ 
 # ra <- land$raster
 ra <- mapa_bioma
 carrega()
-mov_5 <- estima_testes(sim = 50, ra = ra, true_value = 800, time = 1, time_adapt = 0, where = "random", landscape_on = FALSE, n_camera = 2)
+mov_6 <- estima_testes(sim = 10, ra = ra, true_value = 800, time = 1, time_adapt = 0, where = "random", landscape_on = FALSE, n_camera = 20)
 ```
 
 Salvando resultados da simulação
 
 ```{r}
-#save(mov_5, file = "./data_sim/mov_5.RData")
-load("./data_sim/mov_5.RData")
+#save(mov_6, file = "./data_sim/mov_6.RData")
+load("./data_sim/mov_6.RData")
 ```
 
 Verificando resultados (O estimador tem que ser ajustado pelo número de semanas)
 
 ```{r}
+800/area_total
 800/(l^2*a_q)
-round(mov_5$est_um,1)
-mean(mov_5$est_um)
-100*abs(mean(mov_5$est_um)-mov_5$real_pop_density)/mov_5$real_pop_density
+round(mov_6$est_um,1)
+mean(mov_6$est_um)
+100*abs(mean(mov_6$est_um)-mov_6$real_pop_density)/mov_6$real_pop_density
 ```
 
 ```{r}

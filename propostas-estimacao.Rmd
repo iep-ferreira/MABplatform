@@ -17,31 +17,29 @@ Considere a distribuição dos animais completamente aleatória. Então, o núme
 
 O número médio de animais encontrados em um $px$ em um intervalo de tempo $k$ é dado por  
 
-
 \[
-\mu = \sum_{r = 1}^{k} A(r) \sum_{j = r}^{k} P(A | r, j) \Big \{1 +  P(R, k-j) \Big \}
+\mu = \sum_{r = 1}^{k} A(r) \sum_{j = r}^{k} P(A | r, j) \Big \{1 +  P_R(k-j) \Big \}
 \]
 
-em que: $A(r)$ é o número esperado de animais no anel que caracteriza a distância $ r-1 < d < r $ do $px$ de referência; 
-$P(A | r, j)$ é a probabilidade de atingir o $px$ que está a distância $r$ em, exatamente, $j$ passos de tempo e $P(R)$ é a probabilidade de retorno do agente ao pixel de $px$ em até $k - j$ passos de tempo. Aqui, consideraremos a probabilidade de dois ou mais retornos como negligenciável. 
+em que: $A(r)$ é o número esperado de animais no anel quadrado que caracteriza a distância \( r \) do $px$ de referência; $P(A | r, j)$ é a probabilidade de atingir o $px$ que está a distância $r$ em, exatamente, $j$ passos de tempo e $P_R(j)$ é a probabilidade de retorno do agente ao pixel de $px$ em até $k - j$ passos de tempo. Aqui, consideraremos a probabilidade de dois ou mais retornos como negligenciável. 
 
-Considerando um agente em uma grade bidimensional que realiza um random walk, a probabilidade \( P(j) \) de atingir uma célula-alvo a uma distância \( r \) em exatamente \( j \) passos (com \( j \geq r \)) é dada pela fórmula:
+Considerando um agente em uma grade bidimensional que realiza um random walk, a probabilidade \( P(A| r, j) \) de atingir uma célula-alvo a uma distância \( r \) em exatamente \( j \) passos (com \( j \geq r \)) é dada pela fórmula:
 
 \[
-P(j) = \binom{j}{\frac{j - r}{2}} \left( \frac{1}{4} \right)^{r} \left( \frac{3}{4} \right)^{\frac{j - r}{2}}
+P(A | r, j) = \binom{j}{\left\lfloor \frac{j - r}{2} \right\rfloor} \left( \frac{1}{9} \right)^r \left( \frac{8}{9} \right)^{\left\lfloor \frac{j - r}{2} \right\rfloor}
 \]
 
-- \( P(j) \): A probabilidade de o agente atingir a célula-alvo exatamente em \( j \) passos.
+- \( P(A | r, j) \): A probabilidade de o agente atingir a célula-alvo à distância \(r\) em, exatamente, \( j \) passos de tempo.
 
-- \( \binom{j}{\frac{j - (r+1)}{2}} \): O coeficiente binomial conta o número de maneiras de organizar os \( j \) passos, onde \( r+1 \) são passos corretos (movendo-se na direção da célula-alvo) e \( \frac{j - (r+1)}{2} \) são passos "extras", que temporariamente desviam o agente da célula-alvo.
+- \( \binom{j}{\frac{j - r}{2}} \): O coeficiente binomial conta o número de maneiras de organizar os \( j \) passos, onde \( r \) são passos corretos (movendo-se na direção da célula-alvo) e \( \frac{j - r}{2} \) são passos "extras", que temporariamente desviam o agente da célula-alvo.
 
-- \( \left( \frac{1}{4} \right)^{r+1} \): Esta é a probabilidade de que o agente faça exatamente \( r+1 \) passos corretos. Em uma grade bidimensional, o agente pode se mover em 4 direções (cima, baixo, esquerda, direita). A probabilidade de mover-se na direção correta é \( \frac{1}{4} \). Como o agente precisa fazer \( r+1 \) passos corretos, a probabilidade é \( \left( \frac{1}{4} \right)^{r+1} \).
+- \( \left( \frac{1}{9} \right)^{r} \): Esta é a probabilidade de que o agente faça exatamente \( r \) passos corretos. Em uma grade bidimensional, o agente pode se mover em 9 direções (cima, baixo, esquerda, direita, diagonais ou permanece no mesmo lugar). A probabilidade de mover-se na direção correta é \( \frac{1}{9} \). 
 
-- \( \left( \frac{3}{4} \right)^{\frac{j - (r+1)}{2}} \): Esta é a probabilidade de que o agente faça \( \frac{j - (r+1)}{2} \) passos "errados" (movimentos em direções não corretas). A probabilidade de fazer um movimento "errado" em uma grade bidimensional é \( \frac{3}{4} \) (já que há 3 direções incorretas). Portanto, a probabilidade de fazer \( \frac{j - (r+1)}{2} \) passos errados é \( \left( \frac{3}{4} \right)^{\frac{j - (r+1)}{2}} \).
+- \( \left( \frac{8}{9} \right)^{\frac{j - r}{2}} \): Esta é a probabilidade de que o agente faça \( \frac{j - r}{2} \) passos "errados" (movimentos em direções não corretas). 
 
 Dado que a partícula encontrou o $px$ de referência em $j \leq k$ passos de tempo, a probabilidade de retorno é, aproximadamente, 
 
 \[
-P(R) ~ \frac{1}{\pi \, (k - j)}  
+P_R(k - j) = \sum_{m=0}^{k-j} \binom{k-j}{m} \left( \frac{1}{9} \right)^{m} \left( \frac{8}{9} \right)^{k-j-m}
 \]
 
