@@ -1,4 +1,5 @@
 tracks.viewer<-function(obj=NULL, r=NULL, adapt=FALSE, biomastats_std = TRUE){
+  
   if(is.null(obj)){print("Erro. Inserir os resultados da simulação"); break}
   # r = valores do raster (formato de matriz)
   if(is.null(r)){print("Erro. Inserir os valores do raster no segundo argumento"); break}
@@ -10,7 +11,7 @@ tracks.viewer<-function(obj=NULL, r=NULL, adapt=FALSE, biomastats_std = TRUE){
   tracks<-NULL
   for(i in 1:n){
     coords<-NULL
-    for(j in 1:time.step){
+    for(j in 1:(time.step-1)){
       coords<-rbind(coords,obj$Evol[[j]][i,])
     }
     tracks[[i]]<-coords
@@ -20,11 +21,12 @@ tracks.viewer<-function(obj=NULL, r=NULL, adapt=FALSE, biomastats_std = TRUE){
     
     if(adapt==FALSE){
       plot(flip(t(r),direction='y'))+
-        for(i in 1:n) lines(tracks[[i]][(time.step.adapt+1):time.step,],type='l',cex=0.05,col=1)+
-        points(tracks[[i]][time.step,1],tracks[[i]][time.step,2],cex=0.8, col=2, pch=19)} 
+        for(i in 1:n) lines(tracks[[i]][(time.step.adapt):(time.step-1),],type='l',cex=0.05,col=1)+
+        points(tracks[[i]][(time.step-1),1],tracks[[i]][(time.step-1),2],cex=0.8, col=2, pch=19)} 
     else{
-      plot(flip(t(r),direction='y'))+for(i in 1:n) lines(tracks[[i]][1:time.step.adapt,],type='l',cex=0.05,col=4) + lines(tracks[[i]][(time.step.adapt+1):time.step,],type='l',cex=0.05,col=1) 
-      points(tracks[[i]][time.step,1],tracks[[i]][time.step,2],cex=0.8,col=2,pch=19)                                                                                                                                 }
+      plot(flip(t(r),direction='y'))+for(i in 1:n) lines(tracks[[i]][1:time.step.adapt,],type='l',cex=0.05,col=4) +
+        lines(tracks[[i]][(time.step.adapt):(time.step-1),],type='l',cex=0.05,col=1) 
+      points(tracks[[i]][(time.step-1),1],tracks[[i]][(time.step-1),2],cex=0.8,col=2,pch=19)                                                                                                                                 }
     
   } else{
     
@@ -37,7 +39,7 @@ tracks.viewer<-function(obj=NULL, r=NULL, adapt=FALSE, biomastats_std = TRUE){
         animal = integer(),
         step = integer()
       )
-      for(j in (time.step.adapt+1):time.step){
+      for(j in (time.step.adapt):(time.step-1)){
         coords <- rbind(coords, data.frame(
           x = obj$Evol[[j]][i, 1],
           y = obj$Evol[[j]][i, 2],
@@ -53,8 +55,8 @@ tracks.viewer<-function(obj=NULL, r=NULL, adapt=FALSE, biomastats_std = TRUE){
     
     for(i in 1:n){
       end_points_df <- rbind(end_points_df, data.frame(
-        x = obj$Evol[[time.step]][i, 1],
-        y = obj$Evol[[time.step]][i, 2],
+        x = obj$Evol[[time.step-1]][i, 1],
+        y = obj$Evol[[time.step-1]][i, 2],
         animal = i
       ))
     }

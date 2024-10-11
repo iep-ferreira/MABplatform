@@ -14,6 +14,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 #install.packages("landscapeR")
 #install.packages("raster")
+#devtools::install_github("iep-ferreira/biomastats")
+#library(biomastats)
 library(raster); library(landscapeR); library(sf);
 library(mapview); library(ggplot2); library(unmarked); 
 library(dplyr)
@@ -27,9 +29,10 @@ carrega <- function(){
 source("./source-codes/soma.R")
 source("./source-codes/land_create.R")
 source("./source-codes/animal_mov.R")
-source("./source-codes/update_mov.R")
+#source("./source-codes/update_mov.R")
 source("./source-codes/tracks_viewer.R")
 source("./source-codes/estima_testes.R")
+source("./source-codes/animal_trajectory.R")  
 }
 ```
 
@@ -45,6 +48,22 @@ novo_mapa <- matrix(getValues(mapa), lado, lado, byrow = TRUE) # the empty lands
 mapa_bioma <- raster(novo_mapa, xmn=0, xmx=lado, ymn=0, ymx=lado)
 #plot(mapa_bioma)
 ```
+
+```{r}
+carrega()
+mov <- animal_mov(n = 2, ra = ra, time = 1, time_adapt = 1, where = "random", landscape_on = FALSE)
+```
+
+
+
+```{r}
+plot(mov$trajectory[[1]][,2:3], type = 'l')
+```
+
+
+
+### Antes da inclusão da velocidade
+
 
 ## Estudo 1 - Contagens em apenas uma armadilha fotográfica
 
@@ -70,7 +89,6 @@ Y \sim P( \lambda = \frac{n ~ k}{l^2})
 
 Uma simulação como exemplo
 
-
 ```{r}
 carrega()
 ```
@@ -82,7 +100,7 @@ l <- lado
 # número de quadrículas por km^2
 (n_q <- 1000000/900)
 # densidade populacional 
-n <- 500
+n <- 300
 (densi.pop <- n/area_total) 
 # densidade por quadrícula 
 (lambda_q <- densi.pop/l_q^2)
@@ -98,9 +116,7 @@ k <- 24*7
 ( est <- k*n/l^2 )
 ```
 
-```{r}
-mov <- animal_mov(n = 5000, ra = ra, time = 1, time_adapt = 4, where = "random", landscape_on = TRUE, n_camera = 4)
-```
+
 ```{r}
 mov$count_table
 ```
@@ -114,7 +130,7 @@ Calcular a posteriori para N
 
 ```{r}
 umf_abund <- unmarkedFramePCount(y = mov$count_table[,-1])
-abund_model <- pcount(~ 1 ~ 1, data = umf_abund, mixture = "NB")
+abund_model <- pcount(~ 1 ~ 1, data = umf_abund, mixture = "P")
 plogis(coef(abund_model)[2])
 exp(coef(abund_model)[1])
 # p é a média das contagens pela probabilidade de detecção estimada
@@ -139,8 +155,15 @@ Isso está errado. A área da zona de detecção tende a ser muito menor do que 
 ## Estimador 1: Cálculo da densidade a partir da área do pixel e do número de passos de tempos
 
 ```{r}
+(densi.pop <- 1000/area_total) 
 (dens <- m_counts / (a_q*k))
 ```
+
+```{r}
+carrega()
+tracks.viewer(obj = mov, ra, adapt = FALSE, biomastats_std = TRUE)
+```
+
 
 Faremos a simulação dos encontros considerando uma câmera, $n$ animais e $k$ passos de tempo.  
 
