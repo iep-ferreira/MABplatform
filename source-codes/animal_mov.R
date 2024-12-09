@@ -11,7 +11,7 @@ animal_mov <- function(n = 100, ra = NULL, time = 1, time_adapt = 1, where = "ra
   # Tempo total de adaptação (a cada min)
   time.step.adapt<-time_adapt*7*12*60
   
-  # tamanho do passo (com base na velocidade em m/s - px / a cada 10s)
+  # tamanho do passo (com base na velocidade em m/s - px / min)
   # por exemplo: 7,2km/2 - 2m/s - 120m / min  - 4px/min
   delta <- velocity*60/30
   
@@ -26,6 +26,8 @@ animal_mov <- function(n = 100, ra = NULL, time = 1, time_adapt = 1, where = "ra
   # dimensão da paisagem
   l <- dim(r)[1]
   
+  ## definindo as posições iniciais dos animais
+  
   # Aleatoriamente ou só onde tem recursos?
   if(where=="random"||where=="resource"){
     
@@ -35,6 +37,7 @@ animal_mov <- function(n = 100, ra = NULL, time = 1, time_adapt = 1, where = "ra
       sample_coords <- sample(1:l,2*n,replace=TRUE)
       #message("passou!/n")
       
+      # matriz de posições iniciais
       M <- matrix(sample_coords, ncol=2)
       
     } else{ # entra no else se for "resource"
@@ -47,7 +50,8 @@ animal_mov <- function(n = 100, ra = NULL, time = 1, time_adapt = 1, where = "ra
           if(r[i,j]==3|r[i,j]==9){coords<-rbind(coords,c(i,j))}  
           # coords são os pontos onde tem recurso
         } # end for 1 
-      } # end for 2
+      
+        } # end for 2
       
       size <- dim(coords)[1] # tamanho do objeto coords  
       # sorteio das posições iniciais dentro de coords

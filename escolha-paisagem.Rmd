@@ -1,0 +1,62 @@
+---
+title: "Escolha das paisagens"
+author: "CeMECA"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Carregar biblios
+
+```{r}
+library(biomastats)
+library(mapview)
+library(leaflet)
+```
+
+## Como dimensionar o efeito de borda
+
+ - Existe uma distância de casa (aprox. $3 km$). Suponhamos que, durante o estudo, o animal não tende a se movimentar mais do que isso; 
+ 
+ - Quantos \% dos animais são propensos a tocar a borda? R: basta dividir a coroa do quadrado exterior, com espessura $3 km$, pela área do quadrado, ou seja:   
+ 
+\[
+P\% = 100*\frac{ [L^2 - (L - 3)^2]}{L^2}, 
+\]
+
+em que $P\%$ é o percentual de animais sujeitos ao efeito de borda. 
+
+ - No nosso modelo, se um animal tocar a borda, ele retorna! Ou seja, temos um cercadinho.  
+ 
+ 
+```{r}
+P <- function(L){
+100*(L^2 - (L - 3)^2)/L^2  
+}
+P(c(10, 20, 30, 40))
+```
+- Por exemplo: 
+
+   - Paisagem de $10 km \times 10 km$: $51,0\%$ de efeito de borda;
+ 
+   - Paisagem de $20 km \times 20 km$: $27,8\%$ de efeito de borda;
+ 
+   - Paisagem de $30 km \times 30 km$: $19,0\%$ de efeito de borda.   
+
+Vamos usar 20 e 30 $km$. 
+
+  - A área de detecção onde a câmera pode ser instalada sempre será menor do que a área de movimentação, de forma a capturar somente grupos que não sofrem o efeito de borda. 
+
+  - Sugestão: várias paisagens e apenas uma câmera no centro de cada paisagem 
+
+## Visualizando paisagens `aleatórias`
+
+```{r}
+#make_polygon(lat = -23, lon  = -48, size = )
+```
+
+
+

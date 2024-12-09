@@ -46,18 +46,18 @@ lado <- dim(mapa)[1]
 novo_mapa <- matrix(getValues(mapa), lado, lado, byrow = TRUE) # the empty landscape
 # transformando a matriz em raster
 mapa_bioma <- raster(novo_mapa, xmn=0, xmx=lado, ymn=0, ymx=lado)
-#plot(mapa_bioma)
+plot(mapa_bioma)
 ```
 
 ```{r}
 carrega()
-mov <- animal_mov(n = 2, ra = ra, time = 1, time_adapt = 1, where = "random", landscape_on = FALSE)
+mov <- animal_mov(n = 5, ra = ra, time = 3, time_adapt = 1, where = "random", landscape_on = FALSE)
 ```
 
-
-
 ```{r}
+par(mfrow = c(1,2))
 plot(mov$trajectory[[1]][,2:3], type = 'l')
+plot(mov$trajectory[[2]][,2:3], type = 'l', col=2)
 ```
 
 
