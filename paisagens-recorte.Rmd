@@ -1,0 +1,50 @@
+---
+title: "obtencao das paissagens"
+author: "CeMECA"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(biomastats)
+library(mapview)
+library(raster)
+```
+
+# Paisagem 1
+
+Considere como coordenadas centrais e posição do campus Lagoa do Sino
+
+-23.59925658469992, -48.52960764232763
+
+```{r}
+make_polygon(lat = -23.5992, lon = -48.5296, size = 30, shape = "square")
+mapas <- load_rasters(start = 2018, end = 2020, method = "download", export_folder_path = "./mapas-uso-ocupacao")
+#save(mapas, file = "mapas.Rdata")
+```
+
+
+```{r}
+load("./mapas.Rdata")
+```
+
+
+```{r}
+# Para salvar como GeoTIFF
+writeRaster(
+  mapas$raster[[3]], 
+  filename = "./raster.tif",  # nome do arquivo de saída
+  format = "GTiff",             # formato GeoTIFF
+  overwrite = TRUE             # sobrescrever se já existir
+)
+```
+
+
+
+
+
+

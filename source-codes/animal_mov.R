@@ -1,19 +1,32 @@
-animal_mov <- function(n = 100, ra = NULL, time = 1, time_adapt = 1, where = "random", landscape_on = TRUE, velocity = 2){
+animal_mov <- function(n = 100, ra = NULL, norm_matrix = NULL, time = 1, time_adapt = 1, 
+                       where = "random", landscape_on = TRUE, velocity = 2){
+  
+  # angle raster properties
+  resolucao <- res(ra)
+  xminimo <- xmin(ra); ymaximo <- ymax(ra)
+  
+  # normalização da norma
+  norm_matrix <- norm_matrix/  max(getValues(norm_matrix))
+  
+  # sd_angular_deflection (43.21) from Xinhai Li 2022 (ecol. informatics)
+  # (43.21/360)*2*pi
   
   # Time in weeks 
   if(time<1){print("Error. At least one week is necessary!"); break}
   
   # considerando 12h de atividade por dia
   
-  # Total de tempo gasto nas simulações (a cada min)
-  time.step<-round(time_adapt+time)*7*12*60
+  # Total de tempo gasto nas simulações (a cada 10s)
+  time.step<-round(time_adapt+time)*7*12*60*10
   
-  # Tempo total de adaptação (a cada min)
-  time.step.adapt<-time_adapt*7*12*60
+  # Tempo total de adaptação (a cada 10s)
+  time.step.adapt<-time_adapt*7*12*60*10
   
   # tamanho do passo (com base na velocidade em m/s - px / min)
-  # por exemplo: 7,2km/2 - 2m/s - 120m / min  - 4px/min
-  delta <- velocity*60/30
+  # por exemplo: 7,2km/h - 2m/s - 120m / min  - 4px/min
+  pixel_side <- 28.66 # (metros, após correção)
+  # delta é quanto andou a cada 10s, medidos em comprimento do pixel
+  delta <- (velocity)*10/pixel_side
   
   # Número de animais (n)
   # r = valores do raster (formato de matriz)
@@ -40,18 +53,21 @@ animal_mov <- function(n = 100, ra = NULL, time = 1, time_adapt = 1, where = "ra
       # matriz de posições iniciais
       M <- matrix(sample_coords, ncol=2)
       
-    } else{ # entra no else se for "resource"
+     } else{ # entra no else se for "resource"
       
-      # distribuição espacial apenas aonde tem recurso
-      coords<-NULL
-      for(i in 2:(l-1)){
-        for(j in 2:(l-1)){
-          # vamos trabalhar com outras formas de alocação (fazer revisão)
-          if(r[i,j]==3|r[i,j]==9){coords<-rbind(coords,c(i,j))}  
+      ## Agora estamos usando matroz de ângulos, e não a de uso e ocupação. 
+      
+    #   
+    #   # distribuição espacial apenas aonde tem recurso
+    #   coords<-NULL
+    #   for(i in 2:(l-1)){
+    #     for(j in 2:(l-1)){
+    #       # vamos trabalhar com outras formas de alocação (fazer revisão)
+    #       if(r[i,j]==3|r[i,j]==9){coords<-rbind(coords,c(i,j))}  
           # coords são os pontos onde tem recurso
-        } # end for 1 
+    #    } # end for 1 
       
-        } # end for 2
+    #    } # end for 2
       
       size <- dim(coords)[1] # tamanho do objeto coords  
       # sorteio das posições iniciais dentro de coords
@@ -76,9 +92,11 @@ animal_mov <- function(n = 100, ra = NULL, time = 1, time_adapt = 1, where = "ra
     if(landscape_on == FALSE){
       trajectory <- NULL
       #time.step
+      theta <- runif(1, 0, 2*pi)  # Sorteia um novo valor de theta
       for(i in 1:time.step){
+        if(i%%500==0){print(100*i/time.step)}
         repeat {
-          theta <- runif(1, 0, 2*pi)  # Sorteia um novo valor de theta
+          theta <- theta   # Sorteia um novo valor de theta
           new_x <- x + delta * cos(theta)
           new_y <- y + delta * sin(theta)
           
@@ -92,7 +110,36 @@ animal_mov <- function(n = 100, ra = NULL, time = 1, time_adapt = 1, where = "ra
         trajectory <- rbind(trajectory, c(i, x, y))
       }
       
-    } else{ stop("Falta implementar!")}
+    } else{ 
+      
+      trajectory <- NULL
+      #time.step
+      theta <- mu <- runif(1, 0, 2*pi)  # Sorteia um novo valor de theta
+      for(i in 1:time.step){
+        if(i%%200==0){
+          print(100*i/time.step)
+          }
+        repeat {
+          
+          coords_ij <- xy_to_ij(round(x), round(y), xminimo, ymaximo, resolucao)$ij
+          mu <- ra[coords_ij[1], coords_ij[2]] 
+          norm <- norm_matrix[coords_ij[1], coords_ij[2]]
+          theta <- mu + rnorm(1, 0, (1-norm+0.01)*pi)  # Sorteia um novo valor de theta
+          new_x <- x + delta * cos(theta)
+          new_y <- y + delta * sin(theta)
+          # Verifica as condições de contorno
+          if(new_x > 0 && new_x < l && new_y > 0 && new_y < l) {
+            x <- new_x
+            y <- new_y
+            break  # Sai do loop se as condições forem satisfeitas
+          } # end-if
+        } # end-repeat
+        trajectory <- rbind(trajectory, c(i, x, y))
+      }
+      
+      
+      
+      }
     
   result[[j]] <- trajectory  
     

@@ -1,0 +1,128 @@
+---
+title: "Estudo de estimação unmarked"
+author: "CeMECA"
+date: "2024-08-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Estudos de Abundância
+
+### Estrutura dos dados 
+
+Os dados são do tipo `contagens`. A estrutura é matricial, sendo que as linhas representam locais (pontos amostrais) e as colunas representam momentos. 
+
+```{r}
+detections <- matrix(c(6, 4, 2, 1, 2, 5, 0, 7, 5, 3, 0, 4), 
+                     nrow = 4, ncol = 3, byrow = TRUE)
+rownames(detections) <- c("Site1", "Site2", "Site3", "Site4")
+colnames(detections) <- c("Occasion1", "Occasion2", "Occasion3")
+```
+
+### Pacotes
+
+```{r}
+# Fazer revisão sobre os pacotes
+library(unmarked)
+#install.packages("camtrapR")
+#library(camtrapR)
+```
+
+### Preparação dos dados
+
+
+```{r}
+umf_abund <- unmarkedFramePCount(y = detections)
+# teste
+## umf_abund <- unmarkedFramePCount(y = matrix(c(2,1,1,1)))
+```
+
+### Modelo sem covariáveis
+
+```{r}
+abund_model <- pcount(~ 1 ~ 1, data = umf_abund)
+```
+
+```{r}
+summary(abund_model)
+```
+```{r}
+coef(abund_model)
+```
+
+```{r}
+#Estimativa da abundância (Lambda) no modelo de N-mixture
+(abund_lambda <- backTransform(abund_model, "state"))
+```
+
+
+```{r}
+# Estimativa da probabilidade de detecção (p) no modelo de N-mixture
+(abund_p <- backTransform(abund_model, "det"))
+```
+
+```{r}
+sum(detections)
+```
+
+```{r}
+81*(1 - 0.96^12)
+```
+## Explicação do modelo
+
+
+### Introdução
+
+O modelo N-mixture com distribuição Poisson é amplamente utilizado em estudos ecológicos para estimar a abundância de uma espécie em vários locais, levando em consideração a detecção imperfeita. Este modelo assume que a contagem de indivíduos em cada local segue uma distribuição de Poisson, e que a detecção desses indivíduos é imperfeita e modelada por uma distribuição Binomial.
+
+### Definições e Fórmulas Matemáticas
+
+#### Abundância Verdadeira
+
+A abundância verdadeira \(N_i\) em cada local \(i\) é modelada como uma variável aleatória que segue uma distribuição de Poisson:
+
+\[
+N_i \sim \text{Poisson}(\lambda)
+\]
+
+onde:
+- \(N_i\) é o número verdadeiro de indivíduos presentes no local \(i\).
+- \(\lambda\) é a taxa média de abundância ou número esperado de indivíduos por local.
+
+#### Probabilidade de Detecção
+
+Dado que há \(N_i\) indivíduos presentes no local \(i\), o número de indivíduos detectados \(y_{ij}\) em uma ocasião de amostragem \(j\) segue uma distribuição Binomial:
+
+\[
+y_{ij} \sim \text{Binomial}(N_i, p)
+\]
+
+onde:
+- \(y_{ij}\) é o número de indivíduos detectados no local \(i\) na ocasião \(j\).
+- \(p\) é a probabilidade de detecção, ou seja, a probabilidade de detectar qualquer indivíduo presente no local em uma única ocasião de amostragem.
+
+#### Função de Verossimilhança
+
+A probabilidade de observar \(y_{ij}\) indivíduos em um local \(i\) e ocasião \(j\) dado \(N_i\) e \(p\) é dada por:
+
+\[
+P(y_{ij} \mid N_i, p) = \binom{N_i}{y_{ij}} p^{y_{ij}} (1 - p)^{N_i - y_{ij}}
+\]
+
+A função de verossimilhança total para as contagens observadas é a combinação das probabilidades de abundância verdadeira e detecção:
+
+\[
+L(\lambda, p \mid \{y_{ij}\}) = \prod_{i=1}^{n} \prod_{j=1}^{J} \sum_{N_i=0}^{\infty} P(y_{ij} \mid N_i, p) P(N_i \mid \lambda)
+\]
+
+onde \(n\) é o número de locais e \(J\) é o número de ocasiões de amostragem.
+
+
+
+
+
+
+

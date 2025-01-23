@@ -1,7 +1,6 @@
 ---
 title: "estudos-movimentacao"
 author: "CeMECA"
-date: "2024-09-16"
 output: html_document
 ---
 
@@ -19,6 +18,9 @@ knitr::opts_chunk$set(echo = TRUE)
 library(raster); library(landscapeR); library(sf);
 library(mapview); library(ggplot2); library(unmarked); 
 library(dplyr)
+library(ggspatial)  # Para lidar com rasters e mapas
+library(sf)# Para geometria vetorial (círculo)
+library(plotly)
 ```
 
 
@@ -33,202 +35,339 @@ source("./source-codes/animal_mov.R")
 source("./source-codes/tracks_viewer.R")
 source("./source-codes/estima_testes.R")
 source("./source-codes/animal_trajectory.R")  
+source("./source-codes/xytoij_transform.R")
 }
 ```
 
 
- - Atribui o mapa da `função_vis` ao objeto `land` 
+ - Visualização do Raster e propriedades
 
 ```{r}
-mapa <- raster("./raster.tiff")
+mapa <- raster("./pre-processamento/raster.tif")
 lado <- dim(mapa)[1]
-# criando uma paisagem vazia - só com zeros
-novo_mapa <- matrix(getValues(mapa), lado, lado, byrow = TRUE) # the empty landscape
-# transformando a matriz em raster
-mapa_bioma <- raster(novo_mapa, xmn=0, xmx=lado, ymn=0, ymx=lado)
-plot(mapa_bioma)
+extent(mapa) <- extent(0, 1833, 0, 1833)
+extent(mapa)
+```
+
+## Transformação de coordenadas raster - plano cartesiano
+
+```{r}
+delimitar <- extent(0, 1800, 0, 1800)
+mapa_delim <- crop(mapa, delimitar)
+extent(mapa_delim)
+plot(mapa_delim)
+```
+
+
+## Mapeamento de preferências para o algoritmo de movimentação
+
+```{r}
+lado_delim <- dim(mapa_delim)[1]
+lado_delim*28.66 # lado de 52.5 km
+# valores do raster e dicionário
+valores_antigos <- sort(unique(getValues(mapa_delim)))
+tabela_classes <- biomastats::dict_build()
+# filtragem e organização das classes na paisagem
+tab_sel <- tabela_classes %>% filter(code %in% valores_antigos) %>%
+  arrange(match(code, valores_antigos))
+# pesos de habitat e movimentação (paisagem toda)
+tab_sel$valores_novos <- c(-10, 10, 8, 8, 4, -3, -8, 1, 1, -10, -5, 2, 1, 7, 1, 3)
+source("./source-codes/alterar_valores_raster.R")  
+pesos_raster <- alterar_valores_raster(mapa_delim, valores_antigos, tab_sel$valores_novos)  
+matrix_pesos <- matrix(getValues(pesos_raster), lado_delim, lado_delim, byrow = TRUE)
+```
+
+
+<!-- ```{r} -->
+<!-- # Dimensões da matriz -->
+<!-- dim <- 1800 -->
+
+<!-- # Coordenadas do centro da bola -->
+<!-- center <- dim / 2 -->
+
+<!-- # Raio da bola -->
+<!-- radius <- dim / 4  # Exemplo: define o raio como um quarto do tamanho da matriz -->
+
+<!-- # Inicializa a matriz -->
+<!-- matrix <- matrix(-10, nrow = dim, ncol = dim) -->
+
+<!-- # Preenche os valores dentro da bola -->
+<!-- for (i in 1:dim) { -->
+<!--   for (j in 1:dim) { -->
+<!--     # Calcula a distância do centro -->
+<!--     distance <- sqrt((i - center)^2 + (j - center)^2) -->
+
+<!--     # Se a distância for menor ou igual ao raio, atribui 10 -->
+<!--     if (distance <= radius) { -->
+<!--       matrix[i, j] <- 10 -->
+<!--     } -->
+<!--   } -->
+<!-- } -->
+
+<!-- # Visualização (opcional) -->
+<!-- #image(matrix, col = c("red", "blue"), main = "Matriz com Bola") -->
+<!-- matrix_raster <- raster(matrix, 0, dim, 0, dim) -->
+<!-- matrix_pesos <- matrix(getValues(matrix_raster), lado_delim, lado_delim, byrow = TRUE) -->
+<!-- plot(raster(matrix_pesos)) -->
+<!-- ``` -->
+
+## Forte repulsão nas bordas da matriz
+
+ - fator de redução sugerido = 2
+
+
+
+# Redução da dimensionalidade da paisagem
+
+```{r}
+M <- matrix_pesos  # M terá dimensão H x W
+
+reduction_factor <- 10
+
+original_H <- dim(M)[1]  # Número de linhas
+original_W <- dim(M)[2]  # Número de colunas
+
+# Dimensões reduzidas
+new_H <- floor(original_H / reduction_factor)
+new_W <- floor(original_W / reduction_factor)
+
+# Matriz reduzida
+M_reduc <- matrix(0, nrow = new_H, ncol = new_W)
+
+for (i in seq_len(new_H)) {
+  for (j in seq_len(new_W)) {
+
+    # Intervalo de linhas e colunas correspondente ao bloco 10x10
+    row_start <- 1 + reduction_factor * (i - 1)
+    row_end   <- min(reduction_factor * i, original_H)
+    col_start <- 1 + reduction_factor * (j - 1)
+    col_end   <- min(reduction_factor * j, original_W)
+
+    bloco <- M[row_start:row_end, col_start:col_end]
+
+    # Exemplo: média (average pooling)
+    M_reduc[i, j] <- mean(bloco, na.rm = TRUE)
+    # Ou use max(bloco), sum(bloco), etc., dependendo do seu objetivo
+  }
+}
+plot(raster(M_reduc))
+```
+
+
+```{r}
+source("./source-codes/matriz_angulo.R")
+# Executando a função
+matrix_theta <- get_angle_map(M_reduc, radius=3)
+save(matrix_theta, file = "./pre-processamento/matrix_theta.Rdata")
+# Plotar
+load("./pre-processamento/matrix_theta.Rdata")
+plot(raster(matrix_theta$angle_matrix)*360/(2*pi))
+```
+
+# Alterando as bordas da matriz de ângulos
+
+```{r}
+nrows <- nrow(matrix_theta$angle_matrix)
+ncols <- ncol(matrix_theta$angle_matrix)
+# Substituir as três primeiras e últimas linhas
+matrix_theta$angle_matrix[1:2, ] <- -pi/2
+matrix_theta$angle_matrix[(nrows-2):nrows, ] <- pi/2
+# Substituir as três primeiras e últimas colunas
+matrix_theta$angle_matrix[, 1:2] <- 0
+matrix_theta$angle_matrix[, (ncols-2):ncols] <- -pi
+#
+# Substituir as três primeiras e últimas linhas
+matrix_theta$norm_matrix[1:2, ] <- 0
+matrix_theta$norm_matrix[(nrows-2):nrows, ] <- 0
+# Substituir as três primeiras e últimas colunas
+matrix_theta$norm_matrix[, 1:2] <- 0
+matrix_theta$norm_matrix[, (ncols-2):ncols] <- 0
+```
+
+
+
+# O campo vetorial em espaço reduzido
+
+```{r}
+weights_raster <- raster(M_reduc, 0, 1800/reduction_factor, 0, 1800/reduction_factor)
+### Verificar se o ângulo está trocado
+raster_theta <- raster(matrix_theta$angle_matrix , 0, 1800/reduction_factor, 0, 1800/reduction_factor)
+range(matrix_theta$angle_matrix)
+extent(raster_theta)
+#
+nrows <- nrow(raster_theta)
+ncols <- ncol(raster_theta)
+#
+grid_spacing <- max(1, floor(min(nrows, ncols) / 40))
+x_coords <- seq(1, ncols, by = grid_spacing)
+y_coords <- seq(1, nrows, by = grid_spacing)
+#
+vector_field <- expand.grid(x = x_coords, y = y_coords)
+vector_field$theta <- extract(raster_theta, cbind(vector_field$x, vector_field$y))
+vector_field$dx <- cos(vector_field$theta)
+vector_field$dy <- sin(vector_field$theta)
+vector_field$scale_factor <- extract(raster(matrix_theta$norm_matrix, 0, 1800/reduction_factor, 0, 1800/reduction_factor), cbind(vector_field$x, vector_field$y))
+#
+# vector_field$scale_factor[ vector_field$scale_factor < 300 ] <- 0
+arrow_scale <- 1/50
+#
+# Aplicar a matriz de escala aos componentes dx e dy
+vector_field$dx <- vector_field$dx * vector_field$scale_factor * arrow_scale
+vector_field$dy <- vector_field$dy * vector_field$scale_factor * arrow_scale
+
+# Converter o raster para data.frame
+raster_df <- as.data.frame(weights_raster, xy = TRUE)
+colnames(raster_df) <- c("x", "y", "weights")
+raster_df$weights_mod <- raster_df$weights*(raster_df$weights<-10)
+
+# plot
+ggplot(vector_field, aes(x = x, y = y))  +
+  geom_raster(data = raster_df, aes(x = x, y = y, fill = weights_mod))  +
+  scale_fill_gradient(low = "red", high = "white", na.value = "white", name = "Weights") +
+  geom_segment(aes(xend = x + dx, yend = y + dy), 
+               arrow = arrow(length = unit(0.1, "cm")), color = "black", alpha = 0.8, linewidth = 0.5) +
+  theme_minimal() +
+  coord_equal() +
+  labs(title = "Campo Vetorial do Raster", x = "Colunas", y = "Linhas")
+```
+
+```{r}
+matrix_theta_reconstituida <- matrix(0, nrow = original_H, ncol = original_W)
+matrix_norm_reconstituida <- matrix(0, nrow = original_H, ncol = original_W)
+
+for (i in seq_len(new_H)) {
+  for (j in seq_len(new_W)) {
+    
+    ang <- matrix_theta$angle_matrix[i, j]
+    nor <- matrix_theta$norm_matrix[i, j]
+    
+    row_start <- 1 + reduction_factor * (i - 1)
+    row_end   <- min(reduction_factor * i, original_H)
+    col_start <- 1 + reduction_factor * (j - 1)
+    col_end   <- min(reduction_factor * j, original_W)
+    
+    matrix_theta_reconstituida[row_start:row_end, col_start:col_end] <- ang
+    matrix_norm_reconstituida[row_start:row_end, col_start:col_end] <- nor
+  }
+}
+#plot(raster(matrix_theta_reconstituida,xmn=0, xmx=lado, ymn=0, ymx=lado))
+plot(raster(matrix_norm_reconstituida,xmn=0, xmx=lado, ymn=0, ymx=lado))
+```
+
+## Convolução dos resultados da matriz theta é necessária, pois senão os ângulos ficam muito parecidos e o animal fica indo e voltando para o mesmo lugar
+
+
+```{r}
+# Criar um kernel para a convolução (exemplo: média 3x3)
+#kernel <- matrix(1 / 49, nrow = 7, ncol = 7)  # Kernel de suavização (média)
+#set.seed(110401)
+ra <- raster(matrix_theta_reconstituida, xmn=0, xmx=lado, ymn=0, ymx=lado)
+norm_matrix <- raster(matrix_norm_reconstituida, xmn=0, xmx=lado, ymn=0, ymx=lado)
+#ra_blurred <- focal(ra, w = kernel, fun = sum, pad = TRUE, padValue = NA)
+plot(norm_matrix)
 ```
 
 ```{r}
 carrega()
-mov <- animal_mov(n = 5, ra = ra, time = 3, time_adapt = 1, where = "random", landscape_on = FALSE)
+#ra_blurred
+mov <- animal_mov(n = 1, ra = ra, norm_matrix = norm_matrix, time = 6, time_adapt = 0, where = "random", landscape_on = TRUE)
 ```
 
+### Depois de verificar concordência entre mov e campo vetorial, 
+colocar mecanismo de inércia
+
+centriode de tempos passados é referência e, se distância aumentar, maior é 
+a probabilidade de volta para a casa
+
 ```{r}
-par(mfrow = c(1,2))
 plot(mov$trajectory[[1]][,2:3], type = 'l')
-plot(mov$trajectory[[2]][,2:3], type = 'l', col=2)
-```
-
-
-
-### Antes da inclusão da velocidade
-
-
-## Estudo 1 - Contagens em apenas uma armadilha fotográfica
-
-Vamos assumir que os animais assumem posições aleatórias e que a quantidade de animais encontrados em um pixel dependa do: 
-
- - Total de animais na rede ($n$); 
- - Área total da rede ($l^2$); 
- - O número de passos de tempo ($k$). 
-
-O número de animais em um determinado pixel no tempo $k$ é uma Poisson: 
-
-\[
-Y_k \sim P( \lambda = n/l^2)
-\]
-
-Logo, o total de animais que entram no pixel de referência ao longo de $k$ passos de tempo é: 
-
-\[
-Y \sim P( \lambda = \frac{n ~ k}{l^2})
-\]
-
-### Simulação
-
-Uma simulação como exemplo
-
-```{r}
-carrega()
-```
-
-```{r}
-# em km^2
-l <- lado
-(area_total <- (900*l^2)/1000000)
-# número de quadrículas por km^2
-(n_q <- 1000000/900)
-# densidade populacional 
-n <- 300
-(densi.pop <- n/area_total) 
-# densidade por quadrícula 
-(lambda_q <- densi.pop/l_q^2)
-# área da quadrícula em km^2
-(a_q <- 900/1000000)
-```
-O valor esperado de contagens seria por pixel, por passo de tempo
-
-```{r}
-n <- 5000
-l <- lado
-k <- 24*7
-( est <- k*n/l^2 )
 ```
 
 
 ```{r}
-mov$count_table
+# Para centro
+centro <- mov$trajectory[[1]][1, 2:3]
+raio <- 3000 / 28.66
+# Para mapa de uso e ocupação
+mapa_df <- as.data.frame(mapa_delim, xy = TRUE)
+colnames(mapa_df) <- c("x", "y", "value")
+dic <- biomastats::dict_build()
+valores_unicos <- unique(values(mapa_delim))
+valores_unicos <- valores_unicos[!is.na(valores_unicos)]  # Remover NAs, se houver
+dd <- data.frame(class = valores_unicos)
+dd$class <- as.numeric(as.character(dd$class))
+dd$color <- sapply(dd$class, function(x) {
+  pos <- which(dic$code == x)
+  if (length(pos) > 0) dic$color[pos] else NA
+})
+paleta_cores <- dd$color
+names(paleta_cores) <- dd$class
+mapa_df$color <- paleta_cores[as.character(mapa_df$value)]
+# Para trajetórias
+traj_df <- as.data.frame(mov$trajectory[[1]])
+colnames(traj_df) <- c("time", "x", "y")
+# Para campo vetorial
+nrows <- nrow(ra)
+ncols <- ncol(ra)
+grid_spacing <- max(1, floor(min(nrows, ncols) / 30))
+x_coords <- seq(1, ncols, by = grid_spacing)
+y_coords <- seq(1, nrows, by = grid_spacing)
+vector_field <- expand.grid(x = x_coords, y = y_coords)
+vector_field$theta <- extract(ra, cbind(vector_field$x, vector_field$y))
+vector_field$dx <- cos(vector_field$theta)
+vector_field$dy <- sin(vector_field$theta)
+arrow_scale <- 0.5
+vector_field$dx <- vector_field$dx * arrow_scale
+vector_field$dy <- vector_field$dy * arrow_scale
+# Criar o círculo (como geometria sf)
+#circle <- st_as_sf(data.frame(geometry = st_point(centro))) %>%
+#st_buffer(dist = raio)
+# Plot com ggplot
+ggplot() +
+  geom_raster(data = mapa_df, aes(x = x, y = y, fill = color), alpha = 0.8) +
+  scale_fill_identity() +   
+  #geom_segment(data = vector_field, aes(x = x, y = y, xend = x + dx, yend = y + dy), 
+  #arrow = arrow(length = unit(0.3, "cm")), color = "red", alpha= 0.8) + 
+  geom_path(data = traj_df, aes(x = x, y = y), color = "black", linewidth = 1.2, alpha = 0.4) +
+  coord_equal(xlim = c(0, lado), ylim = c(0, lado)) +
+  theme_minimal() +
+  labs(title = "Centro de Atividade e Home Range",
+       x = "Longitude",
+       y = "Latitude")
 ```
+
 
 ```{r}
-5000/area_total
+trajectory <- as.data.frame(mov$trajectory[[1]])
+colnames(trajectory) <- c("t","x","y")
+dim(trajectory)
+trajectory <- trajectory %>% filter(t%%100==0)
+# Criar o gráfico com animação
+fig <- plot_ly(
+  data = trajectory,
+  x = ~x,
+  y = ~y,
+  frame = ~t,                      # Variação do tempo
+  type = 'scatter',
+  mode = 'markers',
+  marker = list(size = 8, color = 'blue')
+) %>%
+  layout(
+    title = "Trajetória Animada",
+    xaxis = list(title = "Coordenada X"),
+    yaxis = list(title = "Coordenada Y"),
+    showlegend = FALSE
+  )
+# Mostrar a animação
+fig
 ```
-Usar OCCU do unmarked e REM
-Calcular a posteriori para N 
+
 
 
 ```{r}
-umf_abund <- unmarkedFramePCount(y = mov$count_table[,-1])
-abund_model <- pcount(~ 1 ~ 1, data = umf_abund, mixture = "P")
-plogis(coef(abund_model)[2])
-exp(coef(abund_model)[1])
-# p é a média das contagens pela probabilidade de detecção estimada
-# nos cálculos abaixo, vou assumir probabilidade de detecção 1 para 
-# normalizar pela área do pixel
-(m_counts <- exp(coef(abund_model)[1])*plogis(coef(abund_model)[2]) )
-# reformular a esperança para NB - continua a mesma fórmula!!!
-coef(abund_model)
+xy_to_ij(500, 1500, 0, 1800, c(1,1))$ij
+ra[301 , 501]
+plot(mov$trajectory[[1]][t,2:3])
 ```
 
-```{r}
-ranef(abund_model)
-```
-
-## Ajuste pela área da zona de detecção
-
-```{r}
-(densi <- exp(coef(abund_model)[1])/ a_q )
-```
-Isso está errado. A área da zona de detecção tende a ser muito menor do que o habitat ou a área explorada durante o período de coletas. Além disso, o cálculo depende da probabilidade de detecção, que é estatisticamente confundida com a abundância média. Basicamente, qualquer valor pode sair dessa operação, e eles não fazem sentido. 
-
-## Estimador 1: Cálculo da densidade a partir da área do pixel e do número de passos de tempos
-
-```{r}
-(densi.pop <- 1000/area_total) 
-(dens <- m_counts / (a_q*k))
-```
-
-```{r}
-carrega()
-tracks.viewer(obj = mov, ra, adapt = FALSE, biomastats_std = TRUE)
-```
-
-
-Faremos a simulação dos encontros considerando uma câmera, $n$ animais e $k$ passos de tempo.  
-
-```{r}
-# ra <- land$raster
-ra <- mapa_bioma
-carrega()
-mov_6 <- estima_testes(sim = 10, ra = ra, true_value = 800, time = 1, time_adapt = 0, where = "random", landscape_on = FALSE, n_camera = 20)
-```
-
-Salvando resultados da simulação
-
-```{r}
-#save(mov_6, file = "./data_sim/mov_6.RData")
-load("./data_sim/mov_6.RData")
-```
-
-Verificando resultados (O estimador tem que ser ajustado pelo número de semanas)
-
-```{r}
-800/area_total
-800/(l^2*a_q)
-round(mov_6$est_um,1)
-mean(mov_6$est_um)
-100*abs(mean(mov_6$est_um)-mov_6$real_pop_density)/mov_6$real_pop_density
-```
-
-```{r}
-mov_5$est_dois
-mean(mov_5$est_dois)
-100*abs(mean(mov_5$est_dois)-mov_5$real_pop_density)/mov_5$real_pop_density
-```
-
-
-
-
-
-
-
-
-O estimado foi:
-
-```{r}
-#mov_teste <- sim_mov(15)
-#(resultados <- lapply(1:15, function(i) sum(mov_teste[[i]]$count_table[1,2])))
-#vetor_resultados <- unlist(resultados)
-#save(vetor_resultados, file = "./data_sim/xxxx.RData")
-load("./data_sim/xxxx.RData")
-mean(vetor_resultados)
-var(vetor_resultados)
-```
-
-A média está parecida, mas a variância excede em muito o esperado pela Poisson. Talvez porque a Poisson estabeleça movimentos independentes, enquanto a movimentação ocorre em um padrão, que é a caminhada aleatória. 
-
-
-## Analisando os resultados com N-mixture
-
-```{r}
-umf_abund <- unmarkedFramePCount(y = t(vetor_resultados))
-# assumindo prob. de detecção 1
-abund_model <- pcount(~ 1 ~ 1, data = umf_abund)
-exp(coef(abund_model))
-```
-
-```{r}
-( est_mod <- exp(coef(abund_model))[2]*exp(coef(abund_model))[1]*l^2/k )
-```
 

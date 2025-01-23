@@ -40,7 +40,7 @@ P(c(10, 20, 30, 40))
 ```
 - Por exemplo: 
 
-   - Paisagem de $10 km \times 10 km$: $51,0\%$ de efeito de borda;
+   - Paisagem de $10 km \times 10 km$: $51,0\%$ de efeito de borda; (não usar)
  
    - Paisagem de $20 km \times 20 km$: $27,8\%$ de efeito de borda;
  
