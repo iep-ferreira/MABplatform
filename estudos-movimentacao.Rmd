@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 #install.packages("landscapeR")
 #install.packages("raster")
+#install.packages("uuid")
 #devtools::install_github("iep-ferreira/biomastats")
 #library(biomastats)
 library(raster); library(landscapeR); library(sf);
@@ -21,6 +22,8 @@ library(dplyr)
 library(ggspatial)  # Para lidar com rasters e mapas
 library(sf)# Para geometria vetorial (círculo)
 library(plotly)
+library(uuid)
+library(readxl); library(writexl)
 ```
 
 
@@ -36,6 +39,8 @@ source("./source-codes/tracks_viewer.R")
 source("./source-codes/estima_testes.R")
 source("./source-codes/animal_trajectory.R")  
 source("./source-codes/xytoij_transform.R")
+source("./source-codes/csv_traj_join.R")  
+source("./source-codes/record_trajectories.R")  
 }
 ```
 
@@ -157,8 +162,8 @@ plot(raster(M_reduc))
 ```{r}
 source("./source-codes/matriz_angulo.R")
 # Executando a função
-matrix_theta <- get_angle_map(M_reduc, radius=3)
-save(matrix_theta, file = "./pre-processamento/matrix_theta.Rdata")
+#matrix_theta <- get_angle_map(M_reduc, radius=3)
+#save(matrix_theta, file = "./pre-processamento/matrix_theta.Rdata")
 # Plotar
 load("./pre-processamento/matrix_theta.Rdata")
 plot(raster(matrix_theta$angle_matrix)*360/(2*pi))
@@ -270,23 +275,67 @@ plot(norm_matrix)
 ```{r}
 carrega()
 #ra_blurred
-mov <- animal_mov(n = 1, ra = ra, norm_matrix = norm_matrix, time = 6, time_adapt = 0, where = "random", landscape_on = TRUE)
+## Colocar um try aqui!!!!
+mov <- animal_mov(n = 2, ra = ra, norm_matrix = norm_matrix, time = 4, time_adapt = 0, where = "random", landscape_on = TRUE) 
 ```
 
-### Depois de verificar concordência entre mov e campo vetorial, 
-colocar mecanismo de inércia
-
-centriode de tempos passados é referência e, se distância aumentar, maior é 
-a probabilidade de volta para a casa
+## Gravando as simulações
 
 ```{r}
-plot(mov$trajectory[[1]][,2:3], type = 'l')
+record_trajectories(mov$trajectory)
+```
+
+## selecionando as simulações
+
+```{r}
+pasta <- "./data_sim/"
+sim_res <- csv_traj_join(pasta, 4)
+sim_res$selected_files
+traj <- sim_res$traj_table
+colnames(traj) <- c("id", "step", "week", "x", "y")
+traj$id_numeric <- as.numeric(factor(traj$id))
+```
+
+## Função de visualização das trajetórias de 1 ou mais indivíduos
+
+```{r}
+plot_animal_path <- function(data = traj_obj, animal = c(1,3), weeks = c(1, 2)){
+
+traj_obj <- traj
+    
+traj_obj <- traj_obj %>% filter(id_numeric %in% animal) %>% filter(week %in% weeks)      
+
+p <- ggplot(traj_obj, aes(x = x, y = y)) +
+  geom_path(aes(color = factor(week),  group = interaction(id_numeric, week)), alpha=0.5) + # Usar geom_path para respeitar a ordem dos dados
+  scale_color_manual(values = rainbow(length(unique(traj_obj$week)))) + # Definir cores para semanas
+  labs(
+    title = "Trajectory",
+    x = "Coordenada X",
+    y = "Coordenada Y",
+    color = "Weeks"
+  ) +
+  theme_minimal() + # Tema limpo
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "right"
+  )
+
+print(p)
+
+}
+```
+
+## ... 
+
+
+```{r}
+plot(mov$trajectory[[1]][30000:30040,2:3], type = 'l')
 ```
 
 
 ```{r}
 # Para centro
-centro <- mov$trajectory[[1]][1, 2:3]
+#centro <- mov$trajectory[[1]][1, 2:3]
 raio <- 3000 / 28.66
 # Para mapa de uso e ocupação
 mapa_df <- as.data.frame(mapa_delim, xy = TRUE)
@@ -304,8 +353,8 @@ paleta_cores <- dd$color
 names(paleta_cores) <- dd$class
 mapa_df$color <- paleta_cores[as.character(mapa_df$value)]
 # Para trajetórias
-traj_df <- as.data.frame(mov$trajectory[[1]])
-colnames(traj_df) <- c("time", "x", "y")
+traj_df <- as.data.frame(traj_stored)
+colnames(traj_df) <- c("id", "step", "week", "x", "y")
 # Para campo vetorial
 nrows <- nrow(ra)
 ncols <- ncol(ra)
@@ -328,7 +377,7 @@ ggplot() +
   scale_fill_identity() +   
   #geom_segment(data = vector_field, aes(x = x, y = y, xend = x + dx, yend = y + dy), 
   #arrow = arrow(length = unit(0.3, "cm")), color = "red", alpha= 0.8) + 
-  geom_path(data = traj_df, aes(x = x, y = y), color = "black", linewidth = 1.2, alpha = 0.4) +
+  geom_path(data = traj_df, aes(x = x, y = y), color = "black", linewidth = 1.2, alpha = 0.7) +
   coord_equal(xlim = c(0, lado), ylim = c(0, lado)) +
   theme_minimal() +
   labs(title = "Centro de Atividade e Home Range",
@@ -337,30 +386,30 @@ ggplot() +
 ```
 
 
-```{r}
-trajectory <- as.data.frame(mov$trajectory[[1]])
-colnames(trajectory) <- c("t","x","y")
-dim(trajectory)
-trajectory <- trajectory %>% filter(t%%100==0)
-# Criar o gráfico com animação
-fig <- plot_ly(
-  data = trajectory,
-  x = ~x,
-  y = ~y,
-  frame = ~t,                      # Variação do tempo
-  type = 'scatter',
-  mode = 'markers',
-  marker = list(size = 8, color = 'blue')
-) %>%
-  layout(
-    title = "Trajetória Animada",
-    xaxis = list(title = "Coordenada X"),
-    yaxis = list(title = "Coordenada Y"),
-    showlegend = FALSE
-  )
-# Mostrar a animação
-fig
-```
+<!-- ```{r} -->
+<!-- trajectory <- as.data.frame(mov$trajectory[[1]]) -->
+<!-- colnames(trajectory) <- c("t","x","y") -->
+<!-- dim(trajectory) -->
+<!-- trajectory <- trajectory %>% filter(t%%100==0) -->
+<!-- # Criar o gráfico com animação -->
+<!-- fig <- plot_ly( -->
+<!--   data = trajectory, -->
+<!--   x = ~x, -->
+<!--   y = ~y, -->
+<!--   frame = ~t,                      # Variação do tempo -->
+<!--   type = 'scatter', -->
+<!--   mode = 'markers', -->
+<!--   marker = list(size = 8, color = 'blue') -->
+<!-- ) %>% -->
+<!--   layout( -->
+<!--     title = "Trajetória Animada", -->
+<!--     xaxis = list(title = "Coordenada X"), -->
+<!--     yaxis = list(title = "Coordenada Y"), -->
+<!--     showlegend = FALSE -->
+<!--   ) -->
+<!-- # Mostrar a animação -->
+<!-- fig -->
+<!-- ``` -->
 
 
 

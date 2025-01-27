@@ -17,10 +17,10 @@ animal_mov <- function(n = 100, ra = NULL, norm_matrix = NULL, time = 1, time_ad
   # considerando 12h de atividade por dia
   
   # Total de tempo gasto nas simulações (a cada 10s)
-  time.step<-round(time_adapt+time)*7*12*60*10
+  time.step<-round(time_adapt+time)*7*12*60*6 - 1
   
   # Tempo total de adaptação (a cada 10s)
-  time.step.adapt<-time_adapt*7*12*60*10
+  time.step.adapt<-time_adapt*7*12*60*6 - 1
   
   # tamanho do passo (com base na velocidade em m/s - px / min)
   # por exemplo: 7,2km/h - 2m/s - 120m / min  - 4px/min
@@ -47,7 +47,7 @@ animal_mov <- function(n = 100, ra = NULL, norm_matrix = NULL, time = 1, time_ad
     if(where=="random"){ # distribuição espacial sem restrições
       # posição inicial dos indíviduos (x_0, y_0)
       
-      sample_coords <- sample(1:l,2*n,replace=TRUE)
+      sample_coords <- sample(3:l-3,2*n,replace=TRUE)
       #message("passou!/n")
       
       # matriz de posições iniciais

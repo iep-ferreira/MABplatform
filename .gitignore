@@ -41,3 +41,8 @@ vignettes/*.pdf
 # Pastas 
 outros-scripts/
 
+# Csv dentro de data_sim
+data_sim/*.csv
+
+
+
