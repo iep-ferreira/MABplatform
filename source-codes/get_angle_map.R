@@ -66,7 +66,22 @@ get_angle_map <- function(obj, radius=4) {
       }
       norm_matrix[i, j] <- sqrt(sum_y^2 + sum_x^2) 
     }
-    }
+  }
   
+  # Substituir as três primeiras e últimas linhas
+  angle_matrix[1:2, ] <- -pi/2
+  angle_matrix[(nr-2):nr, ] <- pi/2
+  # Substituir as três primeiras e últimas colunas
+  angle_matrix[, 1:2] <- 0
+  angle_matrix[, (nc-2):nc] <- -pi
+  #
+  # Substituir as três primeiras e últimas linhas
+  norm_matrix[1:2, ] <- 0
+  norm_matrix[(nr-2):nr, ] <- 0
+  # Substituir as três primeiras e últimas colunas
+  norm_matrix[, 1:2] <- 0
+  norm_matrix[, (nc-2):nc] <- 0
+  
+
   return(list(angle_matrix = angle_matrix, norm_matrix = norm_matrix))
 }

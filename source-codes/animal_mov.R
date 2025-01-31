@@ -1,12 +1,12 @@
-animal_mov <- function(n = 100, ra = NULL, norm_matrix = NULL, time = 1, time_adapt = 1, 
+animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 1, time_adapt = 1, 
                        where = "random", landscape_on = TRUE, velocity = 2){
   
   # angle raster properties
-  resolucao <- res(ra)
-  xminimo <- xmin(ra); ymaximo <- ymax(ra)
+  resolucao <- res(raster_theta)
+  xminimo <- xmin(raster_theta); ymaximo <- ymax(raster_theta)
   
   # normalização da norma
-  norm_matrix <- norm_matrix/  max(getValues(norm_matrix))
+  raster_norm <- raster_norm/  max(getValues(raster_norm))
   
   # sd_angular_deflection (43.21) from Xinhai Li 2022 (ecol. informatics)
   # (43.21/360)*2*pi
@@ -30,10 +30,10 @@ animal_mov <- function(n = 100, ra = NULL, norm_matrix = NULL, time = 1, time_ad
   
   # Número de animais (n)
   # r = valores do raster (formato de matriz)
-  if(is.null(ra)){print("Erro. Inserir os valores do raster no segundo argumento"); break}
+  if(is.null(raster_theta)){print("Erro. Inserir os valores do raster no segundo argumento"); break}
   
   # Extraindo valores do raster, na forma de matriz 
-  r <- values(ra, format="matrix")
+  r <- values(raster_theta, format="matrix")
   # Neste caso, r vira uma matriz auxiliar
   
   # dimensão da paisagem
@@ -122,8 +122,8 @@ animal_mov <- function(n = 100, ra = NULL, norm_matrix = NULL, time = 1, time_ad
         repeat {
           
           coords_ij <- xy_to_ij(round(x), round(y), xminimo, ymaximo, resolucao)$ij
-          mu <- ra[coords_ij[1], coords_ij[2]] 
-          norm <- norm_matrix[coords_ij[1], coords_ij[2]]
+          mu <- raster_theta[coords_ij[1], coords_ij[2]] 
+          norm <- raster_norm[coords_ij[1], coords_ij[2]]
           theta <- mu + rnorm(1, 0, (1-norm+0.01)*pi)  # Sorteia um novo valor de theta
           new_x <- x + delta * cos(theta)
           new_y <- y + delta * sin(theta)
