@@ -58,16 +58,11 @@ source("./source-codes/plot_animal_path.R")
 mapa <- raster("./pre-processamento/raster.tif")
 lado <- dim(mapa)[1]
 extent(mapa) <- extent(0, 1833, 0, 1833)
-extent(mapa)
-```
-
-## Transformação de coordenadas raster - plano cartesiano
-
-```{r}
 delimitar <- extent(0, 1800, 0, 1800)
 mapa_delim <- crop(mapa, delimitar)
-extent(mapa_delim)
+#extent(mapa_delim)
 #plot(mapa_delim)
+lado_delim <- dim(mapa_delim)[1]
 ```
 
 
@@ -76,7 +71,6 @@ extent(mapa_delim)
 ### transforma o mapa de uso e ocupação em uma matriz de pesos
 
 ```{r}
-lado_delim <- dim(mapa_delim)[1]
 lado_delim*28.66 # lado de 52.5 km
 # valores do raster e dicionário
 valores_antigos <- sort(unique(getValues(mapa_delim)))
@@ -129,6 +123,7 @@ Aqui, realiza-se a expansão das matrizes reduzidas, a fim de se obter a dimens�
 
 ```{r}
 carrega()
+reduction_factor <- 2
 matrix_result <- matrix_expand(matrix_theta, reduction_factor)
 #plot(raster(matrix_result$norm, xmn=0, xmx=lado_delim, ymn=0, ymx=lado_delim))
 ```
@@ -139,21 +134,18 @@ rast_theta <- raster(matrix_result$theta, xmn=0, xmx=lado_delim, ymn=0, ymx=lado
 rast_norm <- raster(matrix_result$norm, xmn=0, xmx=lado_delim, ymn=0, ymx=lado_delim)
 hash_value <- digest(file = "./pre-processamento/matrix_theta.Rdata", algo = "sha256")
 ## gravando as simulações
-sim <- 700
+sim <- 4
 for(i in 1:sim){
 try({
 mov <- animal_mov(n = 1, raster_theta = rast_theta, raster_norm = rast_norm, time = 4, time_adapt = 0, where = "random", landscape_on = TRUE) 
 record_trajectories(mov$trajectory, hash_value)
 })
-}
+} # end-for
 ```
 
-## selecionando e colapsando as simulações para análise
 
 ```{r}
-carrega()
-dir_path <- "./data_sim/"
-traj <- select_trajectories(dir_path = dir_path, n_sample = 70)
+traj <- select_trajectories(dir_path = dir_path, n_sample = 4)
 #class(traj)
 ```
 
@@ -162,9 +154,9 @@ traj <- select_trajectories(dir_path = dir_path, n_sample = 70)
 ```{r}
 carrega()
 # primeira forma
-plot_animal_path(trajetory_obj = traj, landscape = mapa_delim, animal = 1:70, weeks = c(1, 2, 3, 4))
+#plot_animal_path(trajetory_obj = traj, landscape = mapa_delim, animal = 1:4, weeks = c(1, 2, 3, 4))
 # segunda forma 
-#plot_animal_path(trajetory_obj = traj, animal = 1:12, weeks = c(1, 2, 3, 4))
+plot_animal_path(trajetory_obj = traj, animal = 1:4, weeks = c(1, 2, 3, 4))
 ```
 
 ### cálculo do raio de dispersão e posição central 
@@ -210,7 +202,7 @@ calc_centroid_radius <- function(data, animal = NULL, weeks = NULL, ft = 28.8/10
 
 
 ```{r}
-result <- calc_centroid_radius(traj, animal = 1:12, weeks = 3:4, ft = 28.8/1000)
+result <- calc_centroid_radius(traj, animal = 1:4, weeks = 3:4, ft = 28.8/1000)
 # Exibir os resultados
 print(result$centroids)    # Tabela com centróides e raios corrigidos pelo fator
 print(result$mcp_polygons) # Polígonos mínimos convexos sem fator de escala
