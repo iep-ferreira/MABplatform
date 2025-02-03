@@ -23,7 +23,7 @@ select_trajectories <- function(dir_path, n_sample){
   sim_res <- csv_traj_join(dir_path, n_sample)
   sim_res$selected_files
   traj <- sim_res$traj_table
-  colnames(traj) <- c("id", "step", "week", "x", "y")
+  colnames(traj) <- c("id", "step", "week", "x", "y", "landscape_hash")
   traj$id_numeric <- as.numeric(factor(traj$id))
   return(traj)
 }

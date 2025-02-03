@@ -23,7 +23,9 @@ library(ggspatial)  # Para lidar com rasters e mapas
 library(sf)# Para geometria vetorial (círculo)
 library(plotly)
 library(uuid)
-library(readxl); library(writexl)
+library(readxl)
+library(writexl)
+library(digest) # para criar hash
 ```
 
 
@@ -83,7 +85,7 @@ tabela_classes <- biomastats::dict_build()
 tab_sel <- tabela_classes %>% filter(code %in% valores_antigos) %>%
   arrange(match(code, valores_antigos))
 # pesos de habitat e movimentação (paisagem toda)
-tab_sel$valores_novos <- c(-10, 10, 8, 8, 4, -3, -8, 1, 1, -10, -5, 2, 1, 7, 1, 3)
+tab_sel$valores_novos <- c(-8, 10, 8, 7, 5, 4, -3, 4, 2, -10, -7, 3, 2, 4, 2, 4)
 source("./source-codes/alterar_valores_raster.R")  
 pesos_raster <- alterar_valores_raster(mapa_delim, valores_antigos, tab_sel$valores_novos)  
 matrix_pesos <- matrix(getValues(pesos_raster), lado_delim, lado_delim, byrow = TRUE)
@@ -94,7 +96,7 @@ matrix_pesos <- matrix(getValues(pesos_raster), lado_delim, lado_delim, byrow = 
 ```{r}
 M <- matrix_pesos  # M terá dimensão H x W
 carrega()
-reduction_factor <- 10
+reduction_factor <- 2
 M_reduc <- reduce_matrix(M, reduction_factor)
 plot(raster(M_reduc))
 ```
@@ -103,17 +105,22 @@ plot(raster(M_reduc))
 ```{r}
 carrega()
 # Executando a função
-#matrix_theta <- get_angle_map(M_reduc, radius=3)
+#matrix_theta <- get_angle_map(M_reduc, radius=3) # usei raio 3  
 #save(matrix_theta, file = "./pre-processamento/matrix_theta.Rdata")
 # Plotar
 load("./pre-processamento/matrix_theta.Rdata")
+# Gera o hash SHA-256 do arquivo
+#hash_value <- digest(file = "./pre-processamento/matrix_theta.Rdata", algo = "sha256")
+#print(hash_value)
 ```
+
 
 ### O campo vetorial em espaço reduzido
 
 ```{r}
 carrega()
-vector_field_vis(M_reduc, theta_matrix = matrix_theta$angle_matrix, norm_matrix = matrix_theta$norm_matrix, reduction_factor = reduction_factor, n_grid = 30)
+vector_field_vis(M_reduc, theta_matrix = matrix_theta$angle_matrix, norm_matrix = matrix_theta$norm_matrix, reduction_factor = reduction_factor, n_grid = 50, arrow_scale = 1/10)
+#plot(raster(matrix_theta$angle_matrix))
 ```
 
 ### Expandir matriz reduzida
@@ -130,16 +137,15 @@ matrix_result <- matrix_expand(matrix_theta, reduction_factor)
 carrega()
 rast_theta <- raster(matrix_result$theta, xmn=0, xmx=lado_delim, ymn=0, ymx=lado_delim)
 rast_norm <- raster(matrix_result$norm, xmn=0, xmx=lado_delim, ymn=0, ymx=lado_delim)
-mov <- animal_mov(n = 2, raster_theta = rast_theta, raster_norm = rast_norm, time = 4, time_adapt = 0, where = "random", landscape_on = TRUE) 
-```
-
-## Gravando as simulações
-
-Rodar apenas quando executar novas simulações. 
-
-```{r}
-
-#record_trajectories(mov$trajectory)
+hash_value <- digest(file = "./pre-processamento/matrix_theta.Rdata", algo = "sha256")
+## gravando as simulações
+sim <- 700
+for(i in 1:sim){
+try({
+mov <- animal_mov(n = 1, raster_theta = rast_theta, raster_norm = rast_norm, time = 4, time_adapt = 0, where = "random", landscape_on = TRUE) 
+record_trajectories(mov$trajectory, hash_value)
+})
+}
 ```
 
 ## selecionando e colapsando as simulações para análise
@@ -147,14 +153,8 @@ Rodar apenas quando executar novas simulações.
 ```{r}
 carrega()
 dir_path <- "./data_sim/"
-traj <- select_trajectories(dir_path = dir_path, n_sample = 10)
+traj <- select_trajectories(dir_path = dir_path, n_sample = 70)
 #class(traj)
-```
-
-## Função de visualização das trajetórias de 1 ou mais indivíduos
-
-```{r}
-
 ```
 
 ### Visualização das trajetórias percorridas por cada animal / grupo
@@ -162,9 +162,9 @@ traj <- select_trajectories(dir_path = dir_path, n_sample = 10)
 ```{r}
 carrega()
 # primeira forma
-plot_animal_path(trajetory_obj = traj, landscape = mapa_delim, animal = 1:10, weeks = c(2, 3, 4))
+plot_animal_path(trajetory_obj = traj, landscape = mapa_delim, animal = 1:70, weeks = c(1, 2, 3, 4))
 # segunda forma 
-#plot_animal_path(trajetory_obj = traj, animal = 1:10, weeks = c(2, 3, 4))
+#plot_animal_path(trajetory_obj = traj, animal = 1:12, weeks = c(1, 2, 3, 4))
 ```
 
 ### cálculo do raio de dispersão e posição central 
@@ -208,8 +208,9 @@ calc_centroid_radius <- function(data, animal = NULL, weeks = NULL, ft = 28.8/10
 }
 ```
 
+
 ```{r}
-result <- calc_centroid_radius(traj, animal = c(1,2,3), weeks = 2:3, ft = 28.8/1000)
+result <- calc_centroid_radius(traj, animal = 1:12, weeks = 3:4, ft = 28.8/1000)
 # Exibir os resultados
 print(result$centroids)    # Tabela com centróides e raios corrigidos pelo fator
 print(result$mcp_polygons) # Polígonos mínimos convexos sem fator de escala
@@ -222,6 +223,14 @@ print(result$mcp_polygons) # Polígonos mínimos convexos sem fator de escala
 
 
 ```{r}
+res(rast_theta)
+xmin(rast_theta)
+ymax(rast_theta)
+
+xy_to_ij(0, 1800, 0, 1800, c(1,1))$ij
+
+floor(1799.9)
+
 xy_to_ij(500, 1500, 0, 1800, c(1,1))$ij
 ra[301 , 501]
 plot(mov$trajectory[[1]][t,2:3])

@@ -94,14 +94,14 @@ animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 
       #time.step
       theta <- runif(1, 0, 2*pi)  # Sorteia um novo valor de theta
       for(i in 1:time.step){
-        if(i%%500==0){print(100*i/time.step)}
+        if(i%%10000==0){print(100*i/time.step)}
         repeat {
           theta <- theta   # Sorteia um novo valor de theta
           new_x <- x + delta * cos(theta)
           new_y <- y + delta * sin(theta)
           
           # Verifica as condições de contorno
-          if(new_x > 0 && new_x < l && new_y > 0 && new_y < l) {
+          if(new_x > 0 && new_x < l && new_y > 1 && new_y <= l) {
             x <- new_x
             y <- new_y
             break  # Sai do loop se as condições forem satisfeitas
@@ -116,19 +116,19 @@ animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 
       #time.step
       theta <- mu <- runif(1, 0, 2*pi)  # Sorteia um novo valor de theta
       for(i in 1:time.step){
-        if(i%%200==0){
+        if(i%%10000==0){
           print(100*i/time.step)
           }
         repeat {
           
-          coords_ij <- xy_to_ij(round(x), round(y), xminimo, ymaximo, resolucao)$ij
+          coords_ij <- xy_to_ij(floor(x), floor(y), xminimo, ymaximo, resolucao)$ij
           mu <- raster_theta[coords_ij[1], coords_ij[2]] 
           norm <- raster_norm[coords_ij[1], coords_ij[2]]
           theta <- mu + rnorm(1, 0, (1-norm+0.01)*pi)  # Sorteia um novo valor de theta
           new_x <- x + delta * cos(theta)
           new_y <- y + delta * sin(theta)
           # Verifica as condições de contorno
-          if(new_x > 0 && new_x < l && new_y > 0 && new_y < l) {
+          if(new_x > 0 && new_x < l && new_y > 1 && new_y <= l) {
             x <- new_x
             y <- new_y
             break  # Sai do loop se as condições forem satisfeitas

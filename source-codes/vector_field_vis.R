@@ -1,4 +1,4 @@
-vector_field_vis <- function(weights_matrix, theta_matrix, norm_matrix, reduction_factor, n_grid ){
+vector_field_vis <- function(weights_matrix, theta_matrix, norm_matrix, reduction_factor, n_grid, arrow_scale = 1/30 ){
   
   weights_raster <- raster(weights_matrix, 0, 1800/reduction_factor, 0, 1800/reduction_factor)
   ### Verificar se o ângulo está trocado
@@ -18,7 +18,7 @@ vector_field_vis <- function(weights_matrix, theta_matrix, norm_matrix, reductio
   vector_field$scale_factor <- extract(raster(norm_matrix, 0, 1800/reduction_factor, 0, 1800/reduction_factor), cbind(vector_field$x, vector_field$y))
   #
   # vector_field$scale_factor[ vector_field$scale_factor < 300 ] <- 0
-  arrow_scale <- 1/50
+  #arrow_scale <- 1/50
   #
   # Aplicar a matriz de escala aos componentes dx e dy
   vector_field$dx <- vector_field$dx * vector_field$scale_factor * arrow_scale
