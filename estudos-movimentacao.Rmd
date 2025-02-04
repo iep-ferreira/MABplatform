@@ -134,18 +134,18 @@ rast_theta <- raster(matrix_result$theta, xmn=0, xmx=lado_delim, ymn=0, ymx=lado
 rast_norm <- raster(matrix_result$norm, xmn=0, xmx=lado_delim, ymn=0, ymx=lado_delim)
 hash_value <- digest(file = "./pre-processamento/matrix_theta.Rdata", algo = "sha256")
 ## gravando as simulações
-sim <- 4
+sim <- 20
 for(i in 1:sim){
 try({
 mov <- animal_mov(n = 1, raster_theta = rast_theta, raster_norm = rast_norm, time = 4, time_adapt = 0, where = "random", landscape_on = TRUE) 
-record_trajectories(mov$trajectory, hash_value)
+record_trajectories(mov, hash_value)
 })
 } # end-for
 ```
 
-
 ```{r}
-traj <- select_trajectories(dir_path = dir_path, n_sample = 4)
+dir_path = "./data_sim/"
+traj <- select_trajectories(dir_path = dir_path, n_sample = 20)
 #class(traj)
 ```
 
@@ -154,9 +154,9 @@ traj <- select_trajectories(dir_path = dir_path, n_sample = 4)
 ```{r}
 carrega()
 # primeira forma
-#plot_animal_path(trajetory_obj = traj, landscape = mapa_delim, animal = 1:4, weeks = c(1, 2, 3, 4))
+plot_animal_path(trajetory_obj = traj, landscape = mapa_delim, animal = 1:20, weeks = c(1, 2, 3, 4))
 # segunda forma 
-plot_animal_path(trajetory_obj = traj, animal = 1:4, weeks = c(1, 2, 3, 4))
+#plot_animal_path(trajetory_obj = traj, animal = 1:20, weeks = c(1, 2, 3, 4))
 ```
 
 ### cálculo do raio de dispersão e posição central 
@@ -194,38 +194,39 @@ calc_centroid_radius <- function(data, animal = NULL, weeks = NULL, ft = 28.8/10
     summarise(geometry = st_convex_hull(st_union(geometry)), .groups = "drop") %>%
     mutate(area_units = st_area(geometry))  # Área do polígono na unidade original dos dados
 
+  # **Cálculo do diâmetro máximo do polígono (MCP)**
+  mcp_polygons <- mcp_polygons %>%
+    rowwise() %>%
+    mutate(
+      max_diameter = ft*max(st_distance(st_cast(geometry, "POINT")))  # Calcula a maior distância entre dois pontos
+    ) %>%
+    ungroup()
+  
+   # **Cálculo da trilha e distância total percorrida**
+  distance_per_animal <- data %>%
+    arrange(id_numeric, step) %>%  # Ordenar por animal e tempo
+    group_by(id_numeric) %>%
+    mutate(
+      step_length = sqrt((x - lag(x))^2 + (y - lag(y))^2) * ft  # Distância entre pontos consecutivos
+    ) %>%
+    summarise(
+      total_distance = sum(step_length, na.rm = TRUE),  # Somar distâncias para cada animal
+      .groups = "drop"
+    )
+  
   # Retornar lista com ambos os resultados
-  return(list(centroids = centroids, mcp_polygons = mcp_polygons))
+  return(list(centroids = centroids, mcp_polygons = mcp_polygons, distances = distance_per_animal))
   
 }
 ```
 
 
 ```{r}
-result <- calc_centroid_radius(traj, animal = 1:4, weeks = 3:4, ft = 28.8/1000)
+result <- calc_centroid_radius(traj, animal = 1:20, weeks = 3:4, ft = 28.8/1000)
 # Exibir os resultados
 print(result$centroids)    # Tabela com centróides e raios corrigidos pelo fator
 print(result$mcp_polygons) # Polígonos mínimos convexos sem fator de escala
-```
-
-
-
-
-
-
-
-```{r}
-res(rast_theta)
-xmin(rast_theta)
-ymax(rast_theta)
-
-xy_to_ij(0, 1800, 0, 1800, c(1,1))$ij
-
-floor(1799.9)
-
-xy_to_ij(500, 1500, 0, 1800, c(1,1))$ij
-ra[301 , 501]
-plot(mov$trajectory[[1]][t,2:3])
+print(result$distances) # Os animais andam, em média, 15km por dia
 ```
 
 

@@ -1,5 +1,15 @@
 animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 1, time_adapt = 1, 
-                       where = "random", landscape_on = TRUE, velocity = 2){
+                       where = "random", landscape_on = TRUE, velocity = 0.347){
+  
+  # considerando uma caminhada média de 15km, os porcos andam em um ritmo médio de 0,174m/s 
+  # tamanho do passo (com base na velocidade em m/s - px / min)
+  # por exemplo: 1.24km/h - 0.347m/s - 20.83m/min  - 0.77px/min
+  pixel_side <- 28.66 # (metros, após correção)
+  # delta é quanto andou a cada minuto, medido em comprimento do pixel
+  delta <- velocity*60/pixel_side
+  
+  # passos com distribuicao de pareto, media delta e alpha igual 5
+  alpha <- 5
   
   # angle raster properties
   resolucao <- res(raster_theta)
@@ -8,25 +18,15 @@ animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 
   # normalização da norma
   raster_norm <- raster_norm/  max(getValues(raster_norm))
   
-  # sd_angular_deflection (43.21) from Xinhai Li 2022 (ecol. informatics)
-  # (43.21/360)*2*pi
-  
   # Time in weeks 
   if(time<1){print("Error. At least one week is necessary!"); break}
   
   # considerando 12h de atividade por dia
+  # Total de tempo gasto nas simulações (em min)
+  time.step<-round(time_adapt+time)*7*12*60 - 1
   
-  # Total de tempo gasto nas simulações (a cada 10s)
-  time.step<-round(time_adapt+time)*7*12*60*6 - 1
-  
-  # Tempo total de adaptação (a cada 10s)
-  time.step.adapt<-time_adapt*7*12*60*6 - 1
-  
-  # tamanho do passo (com base na velocidade em m/s - px / min)
-  # por exemplo: 7,2km/h - 2m/s - 120m / min  - 4px/min
-  pixel_side <- 28.66 # (metros, após correção)
-  # delta é quanto andou a cada 10s, medidos em comprimento do pixel
-  delta <- (velocity)*10/pixel_side
+  # Tempo total de adaptação (em min)
+  time.step.adapt<-time_adapt*7*12*60 - 1
   
   # Número de animais (n)
   # r = valores do raster (formato de matriz)
@@ -94,11 +94,11 @@ animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 
       #time.step
       theta <- runif(1, 0, 2*pi)  # Sorteia um novo valor de theta
       for(i in 1:time.step){
-        if(i%%10000==0){print(100*i/time.step)}
+        if(i%%1000==0){print(100*i/time.step)}
         repeat {
-          theta <- theta   # Sorteia um novo valor de theta
-          new_x <- x + delta * cos(theta)
-          new_y <- y + delta * sin(theta)
+          step_size <- rpareto_media(1, delta, alpha)
+          new_x <- x + step_size * cos(theta)
+          new_y <- y + step_size * sin(theta)
           
           # Verifica as condições de contorno
           if(new_x > 0 && new_x < l && new_y > 1 && new_y <= l) {
@@ -116,7 +116,7 @@ animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 
       #time.step
       theta <- mu <- runif(1, 0, 2*pi)  # Sorteia um novo valor de theta
       for(i in 1:time.step){
-        if(i%%10000==0){
+        if(i%%1000==0){
           print(100*i/time.step)
           }
         repeat {
@@ -125,8 +125,9 @@ animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 
           mu <- raster_theta[coords_ij[1], coords_ij[2]] 
           norm <- raster_norm[coords_ij[1], coords_ij[2]]
           theta <- mu + rnorm(1, 0, (1-norm+0.01)*pi)  # Sorteia um novo valor de theta
-          new_x <- x + delta * cos(theta)
-          new_y <- y + delta * sin(theta)
+          step_size <- rpareto_media(1, delta, alpha)
+          new_x <- x + step_size * cos(theta)
+          new_y <- y + step_size * sin(theta)
           # Verifica as condições de contorno
           if(new_x > 0 && new_x < l && new_y > 1 && new_y <= l) {
             x <- new_x
@@ -148,6 +149,17 @@ animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 
   return(list("time.step" = time.step,"time.step.adapt" = time.step.adapt, "trajectory" = result))
 } # fim for animal movements
 
-
+rpareto_media <- function(n, media, alpha) {
+  if (alpha <= 1) stop("O parâmetro alpha deve ser maior que 1 para a média existir.")
+  
+  # Calcular o parâmetro x_m a partir da média desejada
+  x_m <- (media * (alpha - 1)) / alpha
+  
+  # Gerar números da distribuição de Pareto
+  U <- runif(n)  # Números uniformes entre 0 e 1
+  step_size <- x_m * (1 - U)^(-1 / alpha)
+  
+  return(step_size)
+}
 
 
