@@ -34,5 +34,15 @@ select_trajectories <- function(dir_path, n_sample){
   traj <- sim_res$traj_table
   colnames(traj) <- c("id", "step", "week", "x", "y")
   traj$id_numeric <- as.numeric(factor(traj$id))
-  return(traj)
+  return(
+    list(
+    trajectories =  traj[,-1], 
+    files = sim_res$selected_files, 
+    metadata = sim_res$selected_files_metadados 
+    )
+  )
 }
+
+
+
+

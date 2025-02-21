@@ -42,7 +42,8 @@ source("./source-codes/tracks_viewer.R")
 source("./source-codes/estima_testes.R")
 source("./source-codes/animal_trajectory.R")  
 source("./source-codes/xytoij_transform.R")
-source("./source-codes/csv_traj_join.R")  
+source("./source-codes/csv_traj_join.R")
+source("./source-codes/csv_traj_join_fast.R")
 source("./source-codes/record_trajectories.R")  
 source("./source-codes/reduce_matrix.R")  
 source("./source-codes/get_angle_map.R")
@@ -151,10 +152,19 @@ print(i)
 ```
 
 ```{r}
-dir_path = "./data_sim/"
-length(list.files(dir_path))
-traj <- select_trajectories(dir_path = dir_path, n_sample = 600)
+carrega()
+dir_path = "D:/dados-abundancia-animal-temp/todas-as-trilhas"
+length(unique(list.files(dir_path)))
+#system.time({
+#traj_data <- select_trajectories(dir_path = dir_path, n_sample = 250)
+#})
+system.time({
+traj_data <- select_trajectories_fast(dir_path = dir_path, n_sample = 250)
+}) # três vezes mais rápido
+traj_data$trajectories
 #class(traj)
+traj <- traj_data$trajectories
+sort(unique(traj$id_numeric))
 ```
 
 ### Visualização das trajetórias percorridas por cada animal / grupo
