@@ -26,6 +26,7 @@ library(uuid)
 library(readxl)
 library(writexl)
 library(digest) # para criar hash
+library(sp)
 ```
 
 
@@ -47,7 +48,9 @@ source("./source-codes/reduce_matrix.R")
 source("./source-codes/get_angle_map.R")
 source("./source-codes/vector_field_vis.R")  
 source("./source-codes/matrix_expand.R")  
-source("./source-codes/plot_animal_path.R")  
+source("./source-codes/plot_animal_path.R")
+source("./source-codes/calc_centroid_radius.R")  
+source("./source-codes/camera_position.R")    
 }
 ```
 
@@ -61,7 +64,7 @@ extent(mapa) <- extent(0, 1833, 0, 1833)
 delimitar <- extent(0, 1800, 0, 1800)
 mapa_delim <- crop(mapa, delimitar)
 #extent(mapa_delim)
-#plot(mapa_delim)
+plot(mapa_delim)
 lado_delim <- dim(mapa_delim)[1]
 ```
 
@@ -92,7 +95,7 @@ M <- matrix_pesos  # M terá dimensão H x W
 carrega()
 reduction_factor <- 2
 M_reduc <- reduce_matrix(M, reduction_factor)
-plot(raster(M_reduc))
+mapview(raster(M_reduc))
 ```
 
 
@@ -113,8 +116,9 @@ load("./pre-processamento/matrix_theta.Rdata")
 
 ```{r}
 carrega()
-vector_field_vis(M_reduc, theta_matrix = matrix_theta$angle_matrix, norm_matrix = matrix_theta$norm_matrix, reduction_factor = reduction_factor, n_grid = 50, arrow_scale = 1/10)
-#plot(raster(matrix_theta$angle_matrix))
+#tiff(width = 1200, height = 1200)
+vector_field_vis(M_reduc, theta_matrix = matrix_theta$angle_matrix, norm_matrix = matrix_theta$norm_matrix, reduction_factor = reduction_factor, n_grid = 20, arrow_scale = 1/10)
+#dev.off()
 ```
 
 ### Expandir matriz reduzida
@@ -134,18 +138,22 @@ rast_theta <- raster(matrix_result$theta, xmn=0, xmx=lado_delim, ymn=0, ymx=lado
 rast_norm <- raster(matrix_result$norm, xmn=0, xmx=lado_delim, ymn=0, ymx=lado_delim)
 hash_value <- digest(file = "./pre-processamento/matrix_theta.Rdata", algo = "sha256")
 ## gravando as simulações
-sim <- 20
+#system.time({
+sim <- 10000
 for(i in 1:sim){
 try({
 mov <- animal_mov(n = 1, raster_theta = rast_theta, raster_norm = rast_norm, time = 4, time_adapt = 0, where = "random", landscape_on = TRUE) 
 record_trajectories(mov, hash_value)
 })
+print(i)  
 } # end-for
+#})
 ```
 
 ```{r}
 dir_path = "./data_sim/"
-traj <- select_trajectories(dir_path = dir_path, n_sample = 20)
+length(list.files(dir_path))
+traj <- select_trajectories(dir_path = dir_path, n_sample = 600)
 #class(traj)
 ```
 
@@ -154,72 +162,12 @@ traj <- select_trajectories(dir_path = dir_path, n_sample = 20)
 ```{r}
 carrega()
 # primeira forma
-plot_animal_path(trajetory_obj = traj, landscape = mapa_delim, animal = 1:20, weeks = c(1, 2, 3, 4))
+plot_animal_path(trajetory_obj = traj, landscape = mapa_delim, animal = 1:30, weeks = c(1, 2, 3, 4))
 # segunda forma 
-#plot_animal_path(trajetory_obj = traj, animal = 1:20, weeks = c(1, 2, 3, 4))
+#plot_animal_path(trajetory_obj = traj, animal = 7, weeks = c(1, 2, 3, 4))
 ```
 
 ### cálculo do raio de dispersão e posição central 
-
-```{r}
-calc_centroid_radius <- function(data, animal = NULL, weeks = NULL, ft = 28.8/1000) {
-  # Filtrar pelos animais e semanas escolhidos (se fornecidos)
-  if (!is.null(animal)) {
-    data <- data %>% filter(id_numeric %in% animal)
-  }
-  if (!is.null(weeks)) {
-    data <- data %>% filter(week %in% weeks)
-  }
-
-  # Aplicar fator de escala **apenas para cálculo de centróide e raio de dispersão**
-  centroids <- data %>%
-    mutate(
-      x_scaled = x * ft,
-      y_scaled = y * ft
-    ) %>%
-    group_by(id_numeric) %>%
-    summarise(
-      centroid_x = mean(x_scaled, na.rm = TRUE),
-      centroid_y = mean(y_scaled, na.rm = TRUE),
-      radius_dispersion = mean(sqrt((x_scaled - centroid_x)^2 + (y_scaled - centroid_y)^2), na.rm = TRUE),
-      .groups = "drop"
-    )
-  
-  # Criar pontos sf **sem aplicar o fator de escala** para os MCPs
-  points_sf <- st_as_sf(data, coords = c("x", "y"), crs = NA)  # Sem definir CRS
-
-  # Calcular MCP para cada animal (usando coordenadas originais)
-  mcp_polygons <- points_sf %>%
-    group_by(id_numeric) %>%
-    summarise(geometry = st_convex_hull(st_union(geometry)), .groups = "drop") %>%
-    mutate(area_units = st_area(geometry))  # Área do polígono na unidade original dos dados
-
-  # **Cálculo do diâmetro máximo do polígono (MCP)**
-  mcp_polygons <- mcp_polygons %>%
-    rowwise() %>%
-    mutate(
-      max_diameter = ft*max(st_distance(st_cast(geometry, "POINT")))  # Calcula a maior distância entre dois pontos
-    ) %>%
-    ungroup()
-  
-   # **Cálculo da trilha e distância total percorrida**
-  distance_per_animal <- data %>%
-    arrange(id_numeric, step) %>%  # Ordenar por animal e tempo
-    group_by(id_numeric) %>%
-    mutate(
-      step_length = sqrt((x - lag(x))^2 + (y - lag(y))^2) * ft  # Distância entre pontos consecutivos
-    ) %>%
-    summarise(
-      total_distance = sum(step_length, na.rm = TRUE),  # Somar distâncias para cada animal
-      .groups = "drop"
-    )
-  
-  # Retornar lista com ambos os resultados
-  return(list(centroids = centroids, mcp_polygons = mcp_polygons, distances = distance_per_animal))
-  
-}
-```
-
 
 ```{r}
 result <- calc_centroid_radius(traj, animal = 1:20, weeks = 3:4, ft = 28.8/1000)
@@ -228,5 +176,68 @@ print(result$centroids)    # Tabela com centróides e raios corrigidos pelo fato
 print(result$mcp_polygons) # Polígonos mínimos convexos sem fator de escala
 print(result$distances) # Os animais andam, em média, 15km por dia
 ```
+
+## Posição das câmeras e contagens
+
+```{r}
+carrega()
+camera_resultado <- camera_position(800, 520, 30, pi, pi/2, 15)
+```
+
+```{r}
+#camera_counts <- function(cam_obj,  traj_data, temp_buffer = 60, ft_m = 28.8){
+
+temp_buffer <- 20
+traj_data <- traj
+cam_obj <- camera_resultado
+
+xc <- cam_obj$x_center
+yc <- cam_obj$y_center
+  
+traj_within <- point.in.polygon(traj_data$x, traj_data$y, cam_obj$poly_df$x,  cam_obj$poly_df$y)
+traj_filtered <- traj_data %>% filter(traj_within == 1)
+
+# aplicando buffer temporal (em minutos)
+traj_filtered <- traj_filtered %>%
+  group_by(id_numeric) %>%
+  arrange(step, .by_group = TRUE) %>% 
+  mutate(
+    keep = {
+      # Vetor lógico para marcar quais linhas serão mantidas
+      keep_vec <- logical(n())
+      # Variável que guarda o "step" da última detecção
+      last_detection_step <- -Inf
+      
+      for (i in seq_len(n())) {
+        # Se o step atual for MAIOR que (última detecção + buffer),
+        # então esta linha passa a ser uma nova detecção
+        if (step[i] > last_detection_step + temp_buffer) {
+          keep_vec[i] <- TRUE
+          last_detection_step <- step[i]  # atualiza o último step de detecção
+        } else {
+          keep_vec[i] <- FALSE
+        }
+      }
+      keep_vec
+    }
+  ) %>%
+  filter(keep) %>%
+  ungroup()
+
+traj_filtered$distance <- sqrt( (traj_filtered$x - xc )^2 +  (traj_filtered$y - yc)^2 )
+  
+#}
+
+life_area_data <- traj_data %>% filter( xc - 200 < x & x < xc + 200 & yc - 200 < y &  yc + 200 > y)
+
+result <- calc_centroid_radius(life_area_data, weeks = 2:4, ft = 28.8/1000)
+
+mapview(result$mcp_polygons) + mapview(camera_resultado$poly_sf) +
+  mapview(traj_filtered, xcol = "x", ycol = "y")
+
+
+```
+
+
 
 

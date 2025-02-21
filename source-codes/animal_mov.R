@@ -94,7 +94,7 @@ animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 
       #time.step
       theta <- runif(1, 0, 2*pi)  # Sorteia um novo valor de theta
       for(i in 1:time.step){
-        if(i%%1000==0){print(100*i/time.step)}
+        ##if(i%%1000==0){print(100*i/time.step)}
         repeat {
           step_size <- rpareto_media(1, delta, alpha)
           new_x <- x + step_size * cos(theta)
@@ -116,9 +116,9 @@ animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 
       #time.step
       theta <- mu <- runif(1, 0, 2*pi)  # Sorteia um novo valor de theta
       for(i in 1:time.step){
-        if(i%%1000==0){
-          print(100*i/time.step)
-          }
+        #if(i%%1000==0){
+        #  print(100*i/time.step)
+        #  }
         repeat {
           
           coords_ij <- xy_to_ij(floor(x), floor(y), xminimo, ymaximo, resolucao)$ij

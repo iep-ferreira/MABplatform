@@ -19,12 +19,12 @@ library(leaflet)
 
 ## Como dimensionar o efeito de borda
 
- - Existe uma distância de casa (aprox. $3 km$). Suponhamos que, durante o estudo, o animal não tende a se movimentar mais do que isso; 
+ - Existe uma distância de casa (aprox. $3 km$) - diâmetro do polígono mínimo convexo. Suponhamos que, durante o estudo, o animal não tende a se movimentar mais do que isso; 
  
  - Quantos \% dos animais são propensos a tocar a borda? R: basta dividir a coroa do quadrado exterior, com espessura $3 km$, pela área do quadrado, ou seja:   
  
 \[
-P\% = 100*\frac{ [L^2 - (L - 3)^2]}{L^2}, 
+P\% = 100*\frac{ [L^2 - (L - 1.5)^2]}{L^2}, 
 \]
 
 em que $P\%$ é o percentual de animais sujeitos ao efeito de borda. 
@@ -34,9 +34,9 @@ em que $P\%$ é o percentual de animais sujeitos ao efeito de borda.
  
 ```{r}
 P <- function(L){
-100*(L^2 - (L - 3)^2)/L^2  
+100*(L^2 - (L - 1.5)^2)/L^2  
 }
-P(c(10, 20, 30, 40))
+P(c(10, 20, 30, 40, 52))
 ```
 - Por exemplo: 
 

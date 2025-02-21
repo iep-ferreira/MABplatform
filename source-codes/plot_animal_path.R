@@ -1,4 +1,5 @@
-plot_animal_path <- function(trajetory_obj, landscape = NULL, animal = c(1,3), weeks = c(1, 2)){
+plot_animal_path <- function(trajetory_obj, landscape = NULL, animal = c(1,3), weeks = c(1, 2), 
+                             alpha_raster = 0.40, alpha_path = 0.9){
   
   #traj_obj <-traj %>% filter(id_numeric %in% c(1,2,3)) %>% filter(week %in% c(1,2,3)) 
   traj_obj <- trajetory_obj %>% filter(id_numeric %in% animal) %>% filter(week %in% weeks)  
@@ -24,9 +25,12 @@ plot_animal_path <- function(trajetory_obj, landscape = NULL, animal = c(1,3), w
     mapa_df$color <- paleta_cores[as.character(mapa_df$value)]
     
     p <- ggplot(data = mapa_df, aes(x = x, y = y)) + 
-      geom_path(data = traj_obj, aes(color = factor(week),  group = interaction(id_numeric, week)), alpha=0.9) + # Usar geom_path para respeitar a ordem dos dados
+      geom_path(data = traj_obj, aes(
+                color = factor(week),  
+                group = interaction(id_numeric, week)), 
+                alpha= alpha_path) + # Usar geom_path para respeitar a ordem dos dados
       scale_color_manual(values = rainbow(length(unique(traj_obj$week)))) + 
-      geom_raster(data = mapa_df, aes(x = x, y = y, fill = color), alpha = 0.25) +    scale_fill_identity() 
+      geom_raster(data = mapa_df, aes(x = x, y = y, fill = color), alpha = alpha_raster) +    scale_fill_identity() 
     labs(
       title = "Trajectory",
       x = "Coordenada X",
