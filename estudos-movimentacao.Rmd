@@ -27,6 +27,10 @@ library(readxl)
 library(writexl)
 library(digest) # para criar hash
 library(sp)
+library(jsonlite)
+library(leafem)
+library(data.table)
+library(gridExtra)
 ```
 
 
@@ -42,8 +46,9 @@ source("./source-codes/tracks_viewer.R")
 source("./source-codes/estima_testes.R")
 source("./source-codes/animal_trajectory.R")  
 source("./source-codes/xytoij_transform.R")
-source("./source-codes/csv_traj_join.R")
+#source("./source-codes/csv_traj_join.R")
 source("./source-codes/csv_traj_join_fast.R")
+source("./source-codes/load_trail_samples.R")
 source("./source-codes/record_trajectories.R")  
 source("./source-codes/reduce_matrix.R")  
 source("./source-codes/get_angle_map.R")
@@ -52,6 +57,8 @@ source("./source-codes/matrix_expand.R")
 source("./source-codes/plot_animal_path.R")
 source("./source-codes/calc_centroid_radius.R")  
 source("./source-codes/camera_position.R")    
+source("./source-codes/camera_attributes.R")  
+source("./source-codes/camera_counts.R")
 }
 ```
 
@@ -65,7 +72,7 @@ extent(mapa) <- extent(0, 1833, 0, 1833)
 delimitar <- extent(0, 1800, 0, 1800)
 mapa_delim <- crop(mapa, delimitar)
 #extent(mapa_delim)
-plot(mapa_delim)
+#plot(mapa_delim)
 lado_delim <- dim(mapa_delim)[1]
 ```
 
@@ -75,7 +82,7 @@ lado_delim <- dim(mapa_delim)[1]
 ### transforma o mapa de uso e ocupação em uma matriz de pesos
 
 ```{r}
-lado_delim*28.66 # lado de 52.5 km
+lado_delim*28.66 # lado de 51.58 km
 # valores do raster e dicionário
 valores_antigos <- sort(unique(getValues(mapa_delim)))
 tabela_classes <- biomastats::dict_build()
@@ -88,6 +95,7 @@ source("./source-codes/alterar_valores_raster.R")
 pesos_raster <- alterar_valores_raster(mapa_delim, valores_antigos, tab_sel$valores_novos)  
 matrix_pesos <- matrix(getValues(pesos_raster), lado_delim, lado_delim, byrow = TRUE)
 ```
+
 
 # Redução da dimensionalidade da paisagem
 
@@ -138,33 +146,145 @@ carrega()
 rast_theta <- raster(matrix_result$theta, xmn=0, xmx=lado_delim, ymn=0, ymx=lado_delim)
 rast_norm <- raster(matrix_result$norm, xmn=0, xmx=lado_delim, ymn=0, ymx=lado_delim)
 hash_value <- digest(file = "./pre-processamento/matrix_theta.Rdata", algo = "sha256")
+```
+
+
+```{r}
 ## gravando as simulações
 #system.time({
-sim <- 10000
-for(i in 1:sim){
-try({
-mov <- animal_mov(n = 1, raster_theta = rast_theta, raster_norm = rast_norm, time = 4, time_adapt = 0, where = "random", landscape_on = TRUE) 
-record_trajectories(mov, hash_value)
-})
-print(i)  
-} # end-for
+#sim <- 10000
+#for(i in 1:sim){
+#try({
+#mov <- animal_mov(n = 1, raster_theta = rast_theta, raster_norm = rast_norm, time = 4, time_adapt = 0,where = "random", landscape_on = TRUE) 
+#record_trajectories(mov, hash_value)
+#})
+#print(i)  
+#} # end-for
 #})
 ```
+
+## processando dados para mapa de densidade 
 
 ```{r}
 carrega()
 dir_path = "D:/dados-abundancia-animal-temp/todas-as-trilhas"
-length(unique(list.files(dir_path)))
-#system.time({
-#traj_data <- select_trajectories(dir_path = dir_path, n_sample = 250)
-#})
+csv_files <- list.files(path = dir_path, pattern = "*.csv", full.names = TRUE)
+set.seed(22041500) # seed - descobrimento do Brasil
+random_file <- sample(csv_files, 40000)
+tab_points <- NULL
 system.time({
-traj_data <- select_trajectories_fast(dir_path = dir_path, n_sample = 250)
-}) # três vezes mais rápido
-traj_data$trajectories
-#class(traj)
+#for(i in 1:length(random_file)){
+#if(i%%500==0){print(100*i/length(random_file))}
+points_df <- fread(random_file[i], skip = 2)
+filtered_points <- points_df %>% filter(week > 1) %>% select(x, y) %>% sample_n(5)
+tab_points <- rbind(tab_points, filtered_points)
+#}
+})
+head(tab_points)
+```
+
+```{r}
+#write_json(tab_points, "./pre-processamento/sample_points_density_estimation.json", pretty = TRUE, auto_unbox = TRUE)
+tab_points_reload <- fromJSON("./pre-processamento/sample_points_density_estimation.json")
+```
+
+## distribuição espacial dos animais e vetores de movimentação
+
+```{r}
+n_grid <- 50
+arrow_scale <- 1/10
+# Criando os rasters
+weights_raster <- raster(matrix_theta$angle_matrix, 0, 1800, 0, 1800)
+raster_theta <- raster(matrix_theta$norm_matrix, 0, 1800, 0, 1800)
+
+# Obtendo dimensões do raster
+nrows <- nrow(raster_theta)
+ncols <- ncol(raster_theta)
+
+grid_spacing <- max(1, floor(min(nrows, ncols) / n_grid))
+x_coords <- seq(1, ncols, by = grid_spacing)
+y_coords <- seq(1, nrows, by = grid_spacing)
+
+vector_field <- expand.grid(x = 2*x_coords, y = 2*y_coords)
+vector_field$theta <- extract(raster_theta, cbind(vector_field$x, vector_field$y))
+vector_field$dx <- cos(vector_field$theta)
+vector_field$dy <- sin(vector_field$theta)
+vector_field$scale_factor <- extract(raster(matrix_theta$norm_matrix, 0, 1800, 0, 1800), cbind(vector_field$x, vector_field$y))
+vector_field$dx <- vector_field$dx * vector_field$scale_factor * arrow_scale
+vector_field$dy <- vector_field$dy * vector_field$scale_factor * arrow_scale
+
+# Criando primeiro plot: Raster + Campo Vetorial
+ggplot(tab_points_reload, aes(x = x, y = y)) +
+  geom_density_2d_filled(alpha = 0.80, bins = 7, n = 500) +
+  #stat_density_2d(aes(fill = ..level..), geom = "polygon", n = 200) +
+  scale_fill_viridis_d(option = "A", direction = -1) +
+  geom_segment(data = vector_field, aes(xend = x + dx, yend = y + dy), 
+  arrow = arrow(length = unit(0.1, "cm")), color = "green", alpha = 0.8, linewidth = 0.4) +
+  theme_minimal() +
+  theme(legend.position = "right")
+```
+
+
+## criando lotes com as trilhas simuladas
+
+```{r}
+carrega()
+dir_path = "D:/dados-abundancia-animal-temp/todas-as-trilhas"
+#length(unique(list.files(dir_path)))
+set.seed(22041500) # seed - descobrimento do Brasil
+files_names <- list.files(dir_path)
+sample_files <- sample(files_names)
+#length(unique(sample_files))
+# Supondo que length(arquivos_embaralhados) == 40000
+trails_samples <- split(sample_files, ceiling(seq_along(sample_files) / 2000))
+# Define o caminho para salvar o arquivo
+json_file <- "./pre-processamento/trails_samples.json"
+# Salva a lista como JSON
+#write_json(trails_samples, json_file, pretty = TRUE, auto_unbox = TRUE)
+# Rabrindo os lotes de listas (trails) salvas
+trails_samples_reloaded <- fromJSON(json_file)
+```
+
+## Criando as câmeras
+
+```{r}
+carrega()
+cam_result <- camera_attributes(
+  displacement = 100, habitat_weigth = matrix_pesos,
+  mov_vector =  rast_theta, mov_norm = rast_norm,                           
+  limit_x = c(100, 1700), limit_y = c(100, 1700), 
+  orientation_angle = NULL, viewing_angle = pi/2, 
+  field_depth = 30)
+```
+
+
+```{r}
+cam_result$cam_attributes_table
+# Salvar a tabela como Excel
+#write_xlsx(cam_result$cam_attributes_table, "./pre-processamento/cam_attributes.xlsx")
+```
+
+```{r}
+cam_result$grid_plot
+```
+
+
+## Carregando um lote/amostra com 2000 trilhas independentes 
+
+```{r}
+carrega()
+arquivos <- paste0(dir_path, "/", trails_samples_reloaded[[1]])
+system.time({
+traj_data <- load_sample_of_trails(arquivos)
+})
 traj <- traj_data$trajectories
-sort(unique(traj$id_numeric))
+traj_data
+```
+
+## Outro método para carregar uma amostra
+
+```{r}
+#traj_data <- select_trajectories(dir_path = dir_path, n_sample = 250)
 ```
 
 ### Visualização das trajetórias percorridas por cada animal / grupo
@@ -172,7 +292,7 @@ sort(unique(traj$id_numeric))
 ```{r}
 carrega()
 # primeira forma
-plot_animal_path(trajetory_obj = traj, landscape = mapa_delim, animal = 1:30, weeks = c(1, 2, 3, 4))
+plot_animal_path(trajetory_obj = traj, landscape = mapa_delim, animal = 900:1200, weeks = c(1, 2, 3, 4))
 # segunda forma 
 #plot_animal_path(trajetory_obj = traj, animal = 7, weeks = c(1, 2, 3, 4))
 ```
@@ -180,74 +300,68 @@ plot_animal_path(trajetory_obj = traj, landscape = mapa_delim, animal = 1:30, we
 ### cálculo do raio de dispersão e posição central 
 
 ```{r}
-result <- calc_centroid_radius(traj, animal = 1:20, weeks = 3:4, ft = 28.8/1000)
+system.time({
+result <- calc_centroid_radius(traj, animal = 1:1000, weeks = 2:4, ft = 28.8/1000)
+})
 # Exibir os resultados
 print(result$centroids)    # Tabela com centróides e raios corrigidos pelo fator
 print(result$mcp_polygons) # Polígonos mínimos convexos sem fator de escala
 print(result$distances) # Os animais andam, em média, 15km por dia
+#json_file_statistics <- "./pre-processamento/trails_statistics.json"
+# Salva a lista como JSON
+#write_json(result, json_file_statistics, pretty = TRUE, auto_unbox = TRUE)
+trails_statistics <- fromJSON(json_file_statistics)
 ```
+
+```{r}
+#plot(trails_statistics$centroids$centroid_x*(28.8), trails_statistics$centroids$centroid_y*(28.8))
+mapview( result$mcp_polygons ) %>% addMouseCoordinates() 
+```
+
+## análise da distância de casa
+
+```{r}
+summary(trails_statistics$mcp_polygons$max_diameter)
+sd(trails_statistics$mcp_polygons$max_diameter)/sqrt(1000)
+hist(trails_statistics$mcp_polygons$max_diameter)
+```
+
+
+## análise da área de vida
+
+```{r}
+(stat_area <- trails_statistics$mcp_polygons$area_units*(28.66/1000)^2)
+summary(stat_area)
+sd(stat_area)/ sqrt(1000)
+```
+
+
 
 ## Posição das câmeras e contagens
 
 ```{r}
 carrega()
-camera_resultado <- camera_position(800, 520, 30, pi, pi/2, 15)
+linha = 52
+current_camera <- cam_result$cam_attributes_table[linha,] 
+camera <- camera_position(
+x = current_camera$x, y = current_camera$y, 
+field_depth = current_camera$field_depth, 
+cam_direction = current_camera$orientation_angle, 
+sector_angle = current_camera$viewing_angle, 
+arc_points = 15)
+```
+
+
+```{r}
+counts_result <- camera_counts(cam_obj = camera, trajectory = traj, temp_buffer = 60, ft = 28.8/1000, chart = TRUE, sample = "amostra_teste")
 ```
 
 ```{r}
-#camera_counts <- function(cam_obj,  traj_data, temp_buffer = 60, ft_m = 28.8){
-
-temp_buffer <- 20
-traj_data <- traj
-cam_obj <- camera_resultado
-
-xc <- cam_obj$x_center
-yc <- cam_obj$y_center
-  
-traj_within <- point.in.polygon(traj_data$x, traj_data$y, cam_obj$poly_df$x,  cam_obj$poly_df$y)
-traj_filtered <- traj_data %>% filter(traj_within == 1)
-
-# aplicando buffer temporal (em minutos)
-traj_filtered <- traj_filtered %>%
-  group_by(id_numeric) %>%
-  arrange(step, .by_group = TRUE) %>% 
-  mutate(
-    keep = {
-      # Vetor lógico para marcar quais linhas serão mantidas
-      keep_vec <- logical(n())
-      # Variável que guarda o "step" da última detecção
-      last_detection_step <- -Inf
-      
-      for (i in seq_len(n())) {
-        # Se o step atual for MAIOR que (última detecção + buffer),
-        # então esta linha passa a ser uma nova detecção
-        if (step[i] > last_detection_step + temp_buffer) {
-          keep_vec[i] <- TRUE
-          last_detection_step <- step[i]  # atualiza o último step de detecção
-        } else {
-          keep_vec[i] <- FALSE
-        }
-      }
-      keep_vec
-    }
-  ) %>%
-  filter(keep) %>%
-  ungroup()
-
-traj_filtered$distance <- sqrt( (traj_filtered$x - xc )^2 +  (traj_filtered$y - yc)^2 )
-  
-#}
-
-life_area_data <- traj_data %>% filter( xc - 200 < x & x < xc + 200 & yc - 200 < y &  yc + 200 > y)
-
-result <- calc_centroid_radius(life_area_data, weeks = 2:4, ft = 28.8/1000)
-
-mapview(result$mcp_polygons) + mapview(camera_resultado$poly_sf) +
-  mapview(traj_filtered, xcol = "x", ycol = "y")
-
-
+counts_result$counts_animals
+counts_result$counts_polygons
+counts_result$detections_table
 ```
-
-
-
+```{r}
+counts_result$map
+```
 

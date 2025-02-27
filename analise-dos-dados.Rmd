@@ -1,0 +1,285 @@
+---
+title: "Análise dos dados"
+author: "iiuri ferreira"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#install.packages("epiR")
+library(epiR)
+library(readxl); library(dplyr); library(ggplot2); library(readr); library(tidyr)
+library(unmarked)
+library(jsonlite)
+```
+
+## Carrega as funções através do código-fonte
+
+```{r}
+carrega <- function(){
+source("./source-codes/get_counts.R")
+source("./source-codes/cam_design.R")
+source("./source-codes/soma.R")
+source("./source-codes/land_create.R")
+source("./source-codes/animal_mov.R")
+#source("./source-codes/update_mov.R")
+source("./source-codes/tracks_viewer.R")
+source("./source-codes/estima_testes.R")
+source("./source-codes/animal_trajectory.R")  
+source("./source-codes/xytoij_transform.R")
+#source("./source-codes/csv_traj_join.R")
+source("./source-codes/csv_traj_join_fast.R")
+source("./source-codes/load_trail_samples.R")
+source("./source-codes/record_trajectories.R")  
+source("./source-codes/reduce_matrix.R")  
+source("./source-codes/get_angle_map.R")
+source("./source-codes/vector_field_vis.R")  
+source("./source-codes/matrix_expand.R")  
+source("./source-codes/plot_animal_path.R")
+source("./source-codes/calc_centroid_radius.R")  
+source("./source-codes/camera_position.R")    
+source("./source-codes/camera_attributes.R")  
+source("./source-codes/camera_counts.R")
+}
+```
+
+
+# Carregamento dos dados
+
+## Distribuição espacial dos animais (n = 40000 trilhas / 5 pontos por trilha)
+
+```{r}
+tab_points_reload <- fromJSON("./pre-processamento/sample_points_density_estimation.json")
+```
+
+## Atributos das câmeras
+
+```{r}
+cam_att <- read_excel("./pre-processamento/cam_attributes.xlsx")
+```
+
+## análise da distribuição espacial - pareto? 
+
+```{r}
+prob_dens <- NULL 
+n_size <- length(tab_points_reload$x)
+for(i in 1:1000){
+  x_center <- runif(1,100, 1700); y_center <- runif(1,100, 1700)
+  distance <- sqrt((tab_points_reload$x - x_center)^2 + (tab_points_reload$y - y_center)^2)
+  where_within <- distance*28.66 < 564 
+  prob_dens[i] <- sum(where_within)/ (n_size)
+}
+prob_dens <- prob_dens*30000
+```
+
+```{r}
+hist(prob_dens, 60)
+sum(prob_dens)/1000
+```
+
+## análise das câmeras
+
+```{r}
+freq_animal_local_km <- NULL 
+n_size <- length(tab_points_reload$x)
+for(i in 1:dim(cam_att)[1]){
+  x_center <- cam_att$x[i]; y_center <- cam_att$y[i]
+  distance <- sqrt((tab_points_reload$x - x_center)^2 + (tab_points_reload$y - y_center)^2)
+  where_within <- distance*28.66 < 564 
+  freq_animal_local_km[i] <- sum(where_within)/ (n_size)
+}
+```
+
+```{r}
+cam_att$freq_animal_local_km <- freq_animal_local_km
+```
+
+## Registros por câmera
+
+```{r}
+directory <- "./pre-processamento/"
+#list.files(directory)
+file_list <- list.files(path = directory, pattern = "cam_records_sample([1-9]|1[0-5])\\.xlsx$", full.names = TRUE)
+#print(file_list)
+
+read_and_merge <- function(file) {
+  read_excel(file)
+}
+cam_records <- do.call(rbind, lapply(file_list, read_and_merge))
+cam_records$camera_id <- rep(1:289, length(file_list))
+cam_records <- cam_records %>% relocate(last_col(), .before = everything())
+sample_n_processed <- 15
+cam_records$freq_animal_local_km <- rep(freq_animal_local_km, sample_n_processed)
+```
+
+## Registros por câmera e período
+
+```{r}
+directory <- "./pre-processamento/"
+#list.files(directory)
+file_list_2 <- list.files(path = directory, pattern = "cam_detections_table_sample([1-9]|1[0-5])\\.xlsx$", full.names = TRUE)
+#print(file_list)
+read_and_merge <- function(file) {
+  read_excel(file)
+}
+detections_table <- do.call(rbind, lapply(file_list_2, read_and_merge))
+detections_table <- detections_table %>% filter(week!=1)
+```
+
+
+## Construindo um resumo das detecções
+
+```{r}
+detections_summary <- detections_table %>% 
+  select(-step, -distance) %>% 
+  group_by(week, sample, camera) %>% 
+  summarise(counts = sum(keep), distinct_animals = length(unique(id_numeric)), .groups = "drop")
+```
+
+# Resultados das câmeras
+
+```{r}
+sample_list <- c(
+"sample1", "sample2", "sample3", 
+"sample4", "sample5", "sample6", 
+"sample7", "sample8", "sample9", 
+"sample10", "sample11", "sample12", 
+"sample13", "sample14", "sample15" 
+)
+```
+
+## apenas um exemplo
+
+```{r}
+carrega()
+teste <- get_counts(sample_list = sample_list, cam_id = 225, detections_summary = detections_summary, camera_records = cam_records)
+est_dens(co = sum(teste$camera_counts$total_counts), detect_probability = 0.41)
+teste$camera_counts$points_local_density
+```
+
+```{r}
+teste$camera_counts
+teste$camera_counts$total_counts
+```
+
+## estimação por N-mixture
+
+
+```{r}
+d_aux <- list()
+list_cam <- sample(1:289, 10)
+for(i in list_cam){
+d_aux[[i]] <- get_counts(sample_list = sample_list, cam_id = i, detections_summary = detections_summary, camera_records = cam_records)$camera_counts
+}
+d_final <- bind_rows(d_aux)
+d_final <- d_final %>% select(camera_id, week, total_counts) %>% pivot_wider(names_from = week, values_from = total_counts, values_fill = 0)
+umf <- unmarkedFramePCount(y = d_final)
+modelo <- pcount(~ 1 ~ 1, umf, mixture = "NB")  
+summary(modelo)
+(p_estimado <- backTransform(modelo, type = "det"))
+(lambda_estimado <- backTransform(modelo, type = "state"))
+```
+
+```{r}
+286/(pi*2.5^2)
+```
+
+
+
+- verificações
+
+```{r}
+cam_records %>% filter(camera_id==225) %>% select(sample, counts) 
+detections_table %>% filter(camera=="camera225"&week!=1) 
+detections_summary %>% filter(camera=="camera225")
+```
+
+
+
+
+# Análise de todas as câmeras c/ todas as amostras
+
+```{r}
+carrega()
+sample_list_mod <- sample(sample_list, 15, replace = FALSE)
+list_cam <- sample(1:289, 289)
+tab_test <- cam_design(sample_list = sample_list_mod, list_cam = list_cam, detections_summary = detections_summary, camera_records = cam_records)
+tab_test$local_density_REM
+```
+
+```{r}
+tab_test$landscape_true_density # densidade simulada na rede
+```
+```{r}
+predictions_cam_rem <- data.frame(
+cam_id = list_cam,
+true_values = as.vector(tab_test$true_cam_density),  # densidade estimada na simulação, por local, por processo pontual
+pred_values = round(as.vector(tab_test$local_density_REM$`REM density`), 2), # densidade por câmera por REM
+error_rate  = round(100*abs(as.vector(tab_test$local_density_REM$`REM density`) - as.vector(tab_test$true_cam_density))/as.vector(tab_test$true_cam_density), 2 )
+)
+print(predictions_cam_rem)
+```
+
+
+```{r}
+tab_test$true_density_average  # densidade média para o conjunto de câmeras
+tab_test$mean_density_rem # densidade média calculada por REM
+```
+
+
+
+
+
+# Variáveis acessórias nos registros de câmera
+
+```{r}
+
+```
+
+
+## Quais conjuntos de cameras vale a pena usar?
+
+```{r}
+normalize_min_max <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+cam_habitats_id <- cam_records %>% filter(habitat_weights > 5) %>% select(camera_id) %>% as.vector() %>% unique()
+cam_antropizadas_id <- cam_records %>% filter(habitat_weights <= 2) %>% select(camera_id) %>% as.vector() %>% unique()
+cam_forrageamento_id <- cam_records %>% filter(normalize_min_max(mov_vector) <= 0.6) %>% select(camera_id) %>% as.vector() %>% unique()
+cam_movimentacao_id <- cam_records %>% filter(normalize_min_max(mov_vector) > 0.6) %>% select(camera_id) %>% as.vector() %>% unique()
+#cam_outliers_id <- cam_records %>% 
+#filter(counts > quantile(cam_records$counts, 0.9)) %>% select(camera_id) %>% as.vector() %>% unique()
+```
+
+
+```{r}
+list_cam <- sample(cam_movimentacao_id$camera_id, 29)
+tab_test <- cam_design(sample_list = sample_list_mod, list_cam = list_cam, detections_summary = detections_summary, camera_records = cam_records)
+tab_test$print_sum_teste
+est_dens(tab_test$print_sum_teste)
+```
+
+ESTOU ERRANDO POR UM FATOR DE 3!!!
+
+```{r}
+tab_test$true_density_average  # densidade média para o conjunto de câmeras
+tab_test$mean_density_rem # densidade média calculada por REM
+3*tab_test$mean_density_rem
+```
+
+```{r}
+plot(pred_values ~ true_values, data = predictions_cam_rem)
+abline(0, 1)
+```
+
+
+
+
+```{r}
+ccc_result <- epi.ccc(tab_test$local_true_cam_density[1,], tab_test$local_density_REM$`REM density`)
+print(ccc_result)
+```

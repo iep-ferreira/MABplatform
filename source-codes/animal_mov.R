@@ -3,7 +3,7 @@ animal_mov <- function(n = 100, raster_theta = NULL, raster_norm = NULL, time = 
   
   # considerando uma caminhada média de 15km, os porcos andam em um ritmo médio de 0,174m/s 
   # tamanho do passo (com base na velocidade em m/s - px / min)
-  # por exemplo: 1.24km/h - 0.347m/s - 20.83m/min  - 0.77px/min
+  # por exemplo: 1.249km/h - 0.347m/s - 20.83m/min  - 0.77px/min
   pixel_side <- 28.66 # (metros, após correção)
   # delta é quanto andou a cada minuto, medido em comprimento do pixel
   delta <- velocity*60/pixel_side

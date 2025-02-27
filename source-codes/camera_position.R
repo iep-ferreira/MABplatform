@@ -18,6 +18,7 @@ camera_position <- function(x_center, y_center, field_depth, cam_direction, sect
               x_center = x_center, 
               y_center = y_center, 
               field_depth = field_depth, 
-              cam_direction, 
-              sector_angle))
+              cam_direction = cam_direction, 
+              sector_angle = sector_angle)
+         )
 } # 

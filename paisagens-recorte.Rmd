@@ -29,22 +29,66 @@ mapas <- load_rasters(start = 2018, end = 2020, method = "download", export_fold
 
 
 ```{r}
-load("./mapas.Rdata")
+load("./pre-processamento/mapas30km.Rdata")
 ```
 
 
 ```{r}
 # Para salvar como GeoTIFF
-writeRaster(
-  mapas$raster[[3]], 
-  filename = "./raster.tif",  # nome do arquivo de saída
-  format = "GTiff",             # formato GeoTIFF
-  overwrite = TRUE             # sobrescrever se já existir
-)
+#writeRaster(
+#  mapas$raster[[3]], 
+#  filename = "./raster.tif",  # nome do arquivo de saída
+#  format = "GTiff",             # formato GeoTIFF
+#  overwrite = TRUE             # sobrescrever se já existir
+#)
+```
+
+```{r}
+png("mapa_lulc.png", width = 4000, height = 3000, res = 600)
+land_vis(mapas_30km, year = 2020)
+dev.off()
+```
+```{r}
+results <- get_area(mapas_30km)
+library(dplyr)
+summa <- results$aggregate_data %>% filter(year == 2020)
+summa$area_perc <- 100*summa$area/sum(summa$area)
+summa %>% arrange(desc(area_perc))
 ```
 
 
+```{r}
+land_dist(results, year = 2020)
+```
+
+## metrics for forest formation 
+
+```{r}
+metrics_forest <- biomastats_metrics(mapas_30km, start = 2018, end = 2020, zone = "23", hemisphere = "south")
+```
 
 
+```{r}
+metrics_forest$metrics_table[3,]
+```
+
+```{r}
+reclass_map(metrics_forest, year = 2020)
+```
+
+## metrics for forest formation + plantation
+
+```{r}
+metrics_forest <- biomastats_metrics(mapas_30km, start = 2018, end = 2020, zone = "23", hemisphere = "south")
+```
+
+
+```{r}
+metrics_forest$metrics_table[3,]
+```
+
+```{r}
+reclass_map(metrics_forest, year = 2020)
+```
 
 

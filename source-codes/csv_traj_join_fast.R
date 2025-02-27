@@ -1,6 +1,7 @@
 library(data.table)
 
 csv_traj_join_fast <- function(pasta, n) {
+  
   # Listar os arquivos CSV na pasta
   arquivos <- list.files(path = pasta, pattern = "\\.csv$", full.names = TRUE)
   
