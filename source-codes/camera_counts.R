@@ -31,7 +31,7 @@ camera_counts <- function(cam_obj, trajectory, temp_buffer = 60, ft = 28.8/1000,
         keep_vec
       }
     ) %>%
-    filter(keep) %>%
+    #filter(keep) %>%
     ungroup()
   
   traj_filtered$distance <- sqrt( (traj_filtered$x - xc )^2 +  (traj_filtered$y - yc)^2 )*ft*1000
@@ -48,7 +48,8 @@ camera_counts <- function(cam_obj, trajectory, temp_buffer = 60, ft = 28.8/1000,
   if(chart == TRUE &  dim(traj_filtered)[1] > 0){ 
     # Criar o mapa com cores personalizadas
     mapa <- mapview(cam_obj$poly_sf, color = "red", col.regions = "red", alpha.regions = 0.3) +  
-      mapview(result$mcp_polygons, color = "blue", col.regions = "blue", alpha.regions = 0.3) +               mapview(traj_filtered, xcol = "x", ycol = "y", color = "green", col.regions = "green", alpha.regions = 0.7)
+      mapview(result$mcp_polygons, color = "blue", col.regions = "blue", alpha.regions = 0.3) + 
+      mapview(traj_filtered, xcol = "x", ycol = "y", color = "green", col.regions = "green", alpha.regions = 0.7)
   } else{mapa <- NULL}
   
   

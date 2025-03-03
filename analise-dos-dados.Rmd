@@ -47,6 +47,10 @@ source("./source-codes/camera_counts.R")
 }
 ```
 
+```{r}
+carrega()
+```
+
 
 # Carregamento dos dados
 
@@ -103,7 +107,7 @@ cam_att$freq_animal_local_km <- freq_animal_local_km
 ```{r}
 directory <- "./pre-processamento/"
 #list.files(directory)
-file_list <- list.files(path = directory, pattern = "cam_records_sample([1-9]|1[0-5])\\.xlsx$", full.names = TRUE)
+file_list <- list.files(path = directory, pattern = "cam_records_rep_sample([1-9]|1[0-9])\\.xlsx$", full.names = TRUE)
 #print(file_list)
 
 read_and_merge <- function(file) {
@@ -112,7 +116,7 @@ read_and_merge <- function(file) {
 cam_records <- do.call(rbind, lapply(file_list, read_and_merge))
 cam_records$camera_id <- rep(1:289, length(file_list))
 cam_records <- cam_records %>% relocate(last_col(), .before = everything())
-sample_n_processed <- 15
+sample_n_processed <- length(file_list)
 cam_records$freq_animal_local_km <- rep(freq_animal_local_km, sample_n_processed)
 ```
 
@@ -121,24 +125,58 @@ cam_records$freq_animal_local_km <- rep(freq_animal_local_km, sample_n_processed
 ```{r}
 directory <- "./pre-processamento/"
 #list.files(directory)
-file_list_2 <- list.files(path = directory, pattern = "cam_detections_table_sample([1-9]|1[0-5])\\.xlsx$", full.names = TRUE)
+file_list_2 <- list.files(path = directory, pattern = "cam_detections_rep_table_sample([1-9]|1[0-9])\\.xlsx$", full.names = TRUE)
 #print(file_list)
 read_and_merge <- function(file) {
   read_excel(file)
 }
 detections_table <- do.call(rbind, lapply(file_list_2, read_and_merge))
 detections_table <- detections_table %>% filter(week!=1)
+detections_table$cam_id  <- parse_number(detections_table$camera) 
+detections_table <- detections_table %>% arrange(cam_id)
 ```
 
 
 ## Construindo um resumo das detecções
 
+
 ```{r}
-detections_summary <- detections_table %>% 
+# este precisa de verificação, pois podemos ter dois animais de 
+# subamostras diferentes passando ao mesmo tempo
+detections_summary_withou_rep <- detections_table %>% 
   select(-step, -distance) %>% 
-  group_by(week, sample, camera) %>% 
-  summarise(counts = sum(keep), distinct_animals = length(unique(id_numeric)), .groups = "drop")
+  group_by(week, sample, cam_id) %>%
+  summarise(counts = sum(keep), distinct_animals = length(unique(id_numeric)), .groups = "drop") %>% arrange(cam_id) 
 ```
+
+```{r}
+detections_summary_with_rep <- detections_table %>% 
+  select(-step, -distance) %>% 
+  group_by(week, sample, cam_id) %>%
+  summarise(counts = length(keep), distinct_animals = length(unique(id_numeric)), .groups = "drop") %>% arrange(cam_id) 
+```
+
+
+## são esperadas 121 detecções por câmera durante o período de 21 dias, ou 40 por semana
+
+```{r}
+(2000*sample_n_processed/2661)*((20.82/1000)*3*7*12*60*(30/1000)*(pi/2+2))/pi
+```
+# contagens médias sem repetiçoes
+
+```{r}
+counts_per_cam <- detections_summary_withou_rep %>% group_by(cam_id) %>% summarise(soma = sum(counts)) %>% arrange(cam_id)
+mean(counts_per_cam$soma)
+```
+# contagens médias com repetiçoes
+
+```{r}
+counts_per_cam_with_rep <- detections_summary_with_rep %>% group_by(cam_id) %>% summarise(soma = sum(counts)) %>% arrange(cam_id)
+mean(counts_per_cam_with_rep$soma)
+```
+
+Achamos o probelma!!! As contagens são 3 vezes menos do que o esperado. Será que todas as trilhas foram abertas e devidamente processadas?? Será que a área de detecção foi corretamente definida? (escala correta)
+
 
 # Resultados das câmeras
 
@@ -148,66 +186,29 @@ sample_list <- c(
 "sample4", "sample5", "sample6", 
 "sample7", "sample8", "sample9", 
 "sample10", "sample11", "sample12", 
-"sample13", "sample14", "sample15" 
+"sample13", "sample14", "sample15", 
+"sample16","sample17", 
+"sample18", "sample19"
 )
 ```
 
-## apenas um exemplo
+## apenas um exemplo REM com repeticões
 
 ```{r}
 carrega()
-teste <- get_counts(sample_list = sample_list, cam_id = 225, detections_summary = detections_summary, camera_records = cam_records)
-est_dens(co = sum(teste$camera_counts$total_counts), detect_probability = 0.41)
+teste <- get_counts(sample_list = sample_list, camera = 30, detections_summary = detections_summary_with_rep, camera_records = cam_records)
+est_dens(co = teste$camera_counts$total_counts)
 teste$camera_counts$points_local_density
-```
-
-```{r}
 teste$camera_counts
-teste$camera_counts$total_counts
 ```
 
-## estimação por N-mixture
-
-
-```{r}
-d_aux <- list()
-list_cam <- sample(1:289, 10)
-for(i in list_cam){
-d_aux[[i]] <- get_counts(sample_list = sample_list, cam_id = i, detections_summary = detections_summary, camera_records = cam_records)$camera_counts
-}
-d_final <- bind_rows(d_aux)
-d_final <- d_final %>% select(camera_id, week, total_counts) %>% pivot_wider(names_from = week, values_from = total_counts, values_fill = 0)
-umf <- unmarkedFramePCount(y = d_final)
-modelo <- pcount(~ 1 ~ 1, umf, mixture = "NB")  
-summary(modelo)
-(p_estimado <- backTransform(modelo, type = "det"))
-(lambda_estimado <- backTransform(modelo, type = "state"))
-```
-
-```{r}
-286/(pi*2.5^2)
-```
-
-
-
-- verificações
-
-```{r}
-cam_records %>% filter(camera_id==225) %>% select(sample, counts) 
-detections_table %>% filter(camera=="camera225"&week!=1) 
-detections_summary %>% filter(camera=="camera225")
-```
-
-
-
-
-# Análise de todas as câmeras c/ todas as amostras
+# REM - Análise de todas as câmeras c/ todas as amostras
 
 ```{r}
 carrega()
-sample_list_mod <- sample(sample_list, 15, replace = FALSE)
+sample_list_mod <- sample(sample_list, 19, replace = FALSE)
 list_cam <- sample(1:289, 289)
-tab_test <- cam_design(sample_list = sample_list_mod, list_cam = list_cam, detections_summary = detections_summary, camera_records = cam_records)
+tab_test <- cam_design(sample_list = sample_list_mod, list_cam = list_cam, detections_summary = detections_summary_with_rep, camera_records = cam_records)
 tab_test$local_density_REM
 ```
 
@@ -229,6 +230,70 @@ print(predictions_cam_rem)
 tab_test$true_density_average  # densidade média para o conjunto de câmeras
 tab_test$mean_density_rem # densidade média calculada por REM
 ```
+## Gráfico da previsão da densidade pelo REM 
+
+```{r}
+plot(pred_values ~ true_values, data = predictions_cam_rem)
+abline(0,1)
+```
+
+## performance para câmeras associadas
+
+```{r}
+carrega()
+sample_list_mod <- sample(sample_list, 19, replace = FALSE)
+list_cam <- sample(1:289, 20)
+tab_test <- cam_design(sample_list = sample_list_mod, list_cam = list_cam, detections_summary = detections_summary_with_rep, camera_records = cam_records)
+tab_test$mean_density_rem
+mean(tab_test$true_cam_density)
+```
+
+
+
+
+## estimação por N-mixture
+
+
+```{r}
+carrega()
+d_aux <- list()
+list_cam <- sample(1:289, 10)
+for(i in list_cam){
+d_aux[[i]] <- get_counts(sample_list = sample_list, cam_id = i, detections_summary = detections_summary, camera_records = cam_records)$camera_counts
+}
+d_final <- bind_rows(d_aux)
+d_final <- d_final %>% select(camera_id, week, total_counts) %>% pivot_wider(names_from = week, values_from = total_counts, values_fill = 0)
+umf <- unmarkedFramePCount(y = d_final)
+modelo <- pcount(~ 1 ~ 1, umf, mixture = "NB")  
+summary(modelo)
+(p_estimado <- backTransform(modelo, type = "det"))
+(lambda_estimado <- backTransform(modelo, type = "state"))
+```
+
+```{r}
+274/(pi*2.5^2)
+```
+
+
+```{r}
+detections_table %>% group_by(cam_id, week, sample) 
+```
+
+
+
+
+- verificações
+
+```{r}
+cam_records %>% filter(camera_id==225) %>% select(sample, counts) 
+detections_table %>% filter(camera=="camera225"&week!=1) 
+detections_summary %>% filter(camera=="camera225")
+```
+
+
+
+
+
 
 
 

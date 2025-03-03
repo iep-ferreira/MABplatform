@@ -1,51 +1,51 @@
 # loop for - para cada lote de processamento
-for(i in 9:20){
+for(i in xx:xx){
+
+  library(raster); library(landscapeR); library(sf);
+  library(mapview); library(ggplot2); library(unmarked); 
+  library(dplyr)
+  library(ggspatial)  # Para lidar com rasters e mapas
+  library(sf)# Para geometria vetorial (círculo)2
+  library(plotly)
+  library(uuid)
+  library(readxl)
+  library(writexl)
+  library(digest) # para criar hash
+  library(sp)
+  library(jsonlite)
   
-library(raster); library(landscapeR); library(sf);
-library(mapview); library(ggplot2); library(unmarked); 
-library(dplyr)
-library(ggspatial)  # Para lidar com rasters e mapas
-library(sf)# Para geometria vetorial (círculo)
-library(plotly)
-library(uuid)
-library(readxl)
-library(writexl)
-library(digest) # para criar hash
-library(sp)
-library(jsonlite)
-
-# carrega as funções de dependência
-carrega <- function(){
-  source("./source-codes/animal_mov.R")
-  source("./source-codes/tracks_viewer.R")
-  source("./source-codes/xytoij_transform.R")
-  source("./source-codes/csv_traj_join_fast.R")
-  source("./source-codes/load_trail_samples.R")
-  source("./source-codes/record_trajectories.R")  
-  source("./source-codes/calc_centroid_radius.R")  
-  source("./source-codes/camera_position.R")    
-  source("./source-codes/camera_attributes.R")  
-  source("./source-codes/camera_counts.R")
-}
-carrega()
-
-
-# ler a tabela de cameras 
-cam_attributes <- read_xlsx("./pre-processamento/cam_attributes.xlsx")
-
-# define o caminho do hd externo
-dir_path = "D:/dados-abundancia-animal-temp/todas-as-trilhas"
-
-# define a lista de arquivos
-json_file <- "./pre-processamento/trails_samples.json"
-trails_samples_reloaded <- fromJSON(json_file)
-
-
-  # abre o excel das contagens
-  file_path <- paste0("./pre-processamento/cam_records_sample",i,".xlsx")
+  # carrega as funções de dependência
+  carrega <- function(){
+    source("./source-codes/animal_mov.R")
+    source("./source-codes/tracks_viewer.R")
+    source("./source-codes/xytoij_transform.R")
+    source("./source-codes/csv_traj_join_fast.R")
+    source("./source-codes/load_trail_samples.R")
+    source("./source-codes/record_trajectories.R")  
+    source("./source-codes/calc_centroid_radius.R")  
+    source("./source-codes/camera_position.R")    
+    source("./source-codes/camera_attributes.R")  
+    source("./source-codes/camera_counts.R")
+  }
+  carrega()
+  
+  
+  # ler a tabela de cameras 
+  cam_attributes <- read_xlsx("./pre-processamento/cam_attributes.xlsx")
+  
+  # define o caminho do hd externo
+  dir_path = "D:/dados-abundancia-animal-temp/todas-as-trilhas"
+  
+  # define a lista de arquivos
+  json_file <- "./pre-processamento/trails_samples.json"
+  trails_samples_reloaded <- fromJSON(json_file)  
+  
   
   # abre o excel das contagens
-  file_path_2 <- paste0("./pre-processamento/cam_detections_table_sample",i,".xlsx")  
+  file_path <- paste0("./pre-processamento/cam_records_rep_sample",i,".xlsx")
+  
+  # abre o excel das contagens
+  file_path_2 <- paste0("./pre-processamento/cam_detections_rep_table_sample",i,".xlsx")  
   
 # carregas as trilhas 
 arquivos <- paste0(dir_path, "/", trails_samples_reloaded[[i]])

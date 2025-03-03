@@ -49,4 +49,5 @@ load_sample_of_trails <- function(list_files){
     files = sim_res$selected_files, 
     metadata = sim_res$selected_files_metadados
   ))
-}
+}  
+  
