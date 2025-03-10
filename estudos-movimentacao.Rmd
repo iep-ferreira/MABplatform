@@ -72,7 +72,7 @@ extent(mapa) <- extent(0, 1833, 0, 1833)
 delimitar <- extent(0, 1800, 0, 1800)
 mapa_delim <- crop(mapa, delimitar)
 #extent(mapa_delim)
-#plot(mapa_delim)
+plot(mapa_delim)
 lado_delim <- dim(mapa_delim)[1]
 ```
 
@@ -129,6 +129,7 @@ carrega()
 vector_field_vis(M_reduc, theta_matrix = matrix_theta$angle_matrix, norm_matrix = matrix_theta$norm_matrix, reduction_factor = reduction_factor, n_grid = 20, arrow_scale = 1/10)
 #dev.off()
 ```
+
 
 ### Expandir matriz reduzida
 

@@ -51,7 +51,6 @@ source("./source-codes/camera_counts.R")
 carrega()
 ```
 
-
 # Carregamento dos dados
 
 ## Distribuição espacial dos animais (n = 40000 trilhas / 5 pontos por trilha)
